@@ -7,11 +7,11 @@
 using namespace cv;
 
 /**
- * Function to calculate optical flow from two images and return the result as a byte array.
+ * @brief Function to calculate optical flow from two images and return the result as a byte array.
  *
  * @param env JNIEnv pointer.
- * @param byteBuffer1 ByteBuffer of the first image.
- * @param byteBuffer2 ByteBuffer of the second image.
+ * @param prevPic byte array of the first image.
+ * @param nextPic byte array of the second image.
  * @param w Width of the images.
  * @param h Height of the images.
  * @return Byte array representing the processed image.
@@ -21,15 +21,20 @@ JNIEXPORT jbyteArray JNICALL
 Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
         JNIEnv *env,
         jobject /* this */,
-        jobject byteBuffer1,
-        jobject byteBuffer2, jint w, jint h) {
+        jbyteArray prevPic,
+        jbyteArray nextPic, jint w, jint h) {
 
-    // Convert ByteBuffer to Mat
-    jbyte *ptr1 = reinterpret_cast<jbyte *>(env->GetDirectBufferAddress(byteBuffer1));
-    jbyte *ptr2 = reinterpret_cast<jbyte *>(env->GetDirectBufferAddress(byteBuffer2));
-    // Assuming the input bytebuffer holds a compact grayscale picture.
-    Mat img1(h, w, CV_8UC1, reinterpret_cast<unsigned char *>(ptr1));
-    Mat img2(h, w, CV_8UC1, reinterpret_cast<unsigned char *>(ptr2));
+    // Get byte array data
+    jbyte *prevPicData = env->GetByteArrayElements(prevPic, NULL);
+    jbyte *nextPicData = env->GetByteArrayElements(nextPic, NULL);
+
+    // Convert byte array to Mat
+    Mat img1(h, w, CV_8UC1, reinterpret_cast<unsigned char *>(prevPicData));
+    Mat img2(h, w, CV_8UC1, reinterpret_cast<unsigned char *>(nextPicData));
+
+    // Release byte array elements
+    env->ReleaseByteArrayElements(prevPic, prevPicData, 0);
+    env->ReleaseByteArrayElements(nextPic, nextPicData, 0);
 
     // Reduce resolution of the images
     Mat img1_small, img2_small;
