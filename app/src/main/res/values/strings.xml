@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">DualPhoneShooter</string>
+    <string name="open_cv_license">OpenCV License</string>
+    <string name="license_details">OpenCV is licensed under the Apache License, Version 2.0. This means you are free to use, modify, and distribute OpenCV, both for commercial and non-commercial purposes, as long as you comply with the terms of the Apache License. For more information, please visit https://opencv.org/license/</string>
+    <string name="app_logo_description">Real Time Optical Flow</string>
+
 </resources>
