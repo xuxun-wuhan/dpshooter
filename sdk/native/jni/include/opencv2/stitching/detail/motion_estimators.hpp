@@ -133,7 +133,7 @@ private:
 class CV_EXPORTS_W BundleAdjusterBase : public Estimator
 {
 public:
-    CV_WRAP Mat refinementMask() const { return refinement_mask_.clone(); }
+    CV_WRAP const Mat refinementMask() const { return refinement_mask_.clone(); }
     CV_WRAP void setRefinementMask(const Mat &mask)
     {
         CV_Assert(mask.type() == CV_8U && mask.size() == Size(3, 3));
@@ -328,18 +328,8 @@ private:
 enum WaveCorrectKind
 {
     WAVE_CORRECT_HORIZ,
-    WAVE_CORRECT_VERT,
-    WAVE_CORRECT_AUTO
+    WAVE_CORRECT_VERT
 };
-
-/** @brief Tries to detect the wave correction kind depending
-on whether a panorama spans horizontally or vertically
-
-@param rmats Camera rotation matrices.
-@return The correction kind to use for this panorama
- */
-CV_EXPORTS
-WaveCorrectKind autoDetectWaveCorrectKind(const std::vector<Mat> &rmats);
 
 /** @brief Tries to make panorama more horizontal (or vertical).
 

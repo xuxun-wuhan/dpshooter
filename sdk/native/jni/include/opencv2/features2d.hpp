@@ -61,10 +61,24 @@ easily switch between different algorithms solving the same problem. This sectio
 matching descriptors that are represented as vectors in a multidimensional space. All objects that
 implement vector descriptor matchers inherit the DescriptorMatcher interface.
 
+@note
+   -   An example explaining keypoint matching can be found at
+        opencv_source_code/samples/cpp/descriptor_extractor_matcher.cpp
+    -   An example on descriptor matching evaluation can be found at
+        opencv_source_code/samples/cpp/detector_descriptor_matcher_evaluation.cpp
+    -   An example on one to many image matching can be found at
+        opencv_source_code/samples/cpp/matching_to_many_images.cpp
+
     @defgroup features2d_draw Drawing Function of Keypoints and Matches
     @defgroup features2d_category Object Categorization
 
 This section describes approaches based on local 2D features and used to categorize objects.
+
+@note
+   -   A complete Bag-Of-Words sample can be found at
+        opencv_source_code/samples/cpp/bagofwords_classification.cpp
+    -   (Python) An example using the features2D framework to perform object categorization can be
+        found at opencv_source_code/samples/python/find_obj.py
 
     @defgroup feature2d_hal Hardware Acceleration Layer
     @{
@@ -76,7 +90,7 @@ This section describes approaches based on local 2D features and used to categor
 namespace cv
 {
 
-//! @addtogroup features2d_main
+//! @addtogroup features2d
 //! @{
 
 // //! writes vector of keypoints to the file storage
@@ -107,10 +121,6 @@ public:
      * Remove keypoints from some image by mask for pixels of this image.
      */
     static void runByPixelsMask( std::vector<KeyPoint>& keypoints, const Mat& mask );
-    /*
-     * Remove objects from some image and a vector of points by mask for pixels of this image
-     */
-    static void runByPixelsMask2VectorPoint(std::vector<KeyPoint> &keypoints, std::vector<std::vector<Point> > &removeFrom, const Mat &mask);
     /*
      * Remove duplicated keypoints.
      */
@@ -216,10 +226,7 @@ public:
     CV_WRAP virtual String getDefaultName() const CV_OVERRIDE;
 
     // see corresponding cv::Algorithm method
-    CV_WRAP inline void write(FileStorage& fs, const String& name) const { Algorithm::write(fs, name); }
-#if CV_VERSION_MAJOR < 5
-    inline void write(const Ptr<FileStorage>& fs, const String& name) const { CV_Assert(fs); Algorithm::write(*fs, name); }
-#endif
+    CV_WRAP inline void write(const Ptr<FileStorage>& fs, const String& name = String()) const { Algorithm::write(fs, name); }
 };
 
 /** Feature detectors in OpenCV have wrappers with a common interface that enables you to easily switch
@@ -233,6 +240,9 @@ computing descriptors represented as vectors in a multidimensional space. All ob
 the vector descriptor extractors inherit the DescriptorExtractor interface.
  */
 typedef Feature2D DescriptorExtractor;
+
+//! @addtogroup features2d_main
+//! @{
 
 
 /** @brief Class for implementing the wrapper which makes detectors and extractors to be affine invariant,
@@ -319,21 +329,6 @@ public:
         double sigma, int descriptorType);
 
     CV_WRAP virtual String getDefaultName() const CV_OVERRIDE;
-
-    CV_WRAP virtual void setNFeatures(int maxFeatures) = 0;
-    CV_WRAP virtual int getNFeatures() const = 0;
-
-    CV_WRAP virtual void setNOctaveLayers(int nOctaveLayers) = 0;
-    CV_WRAP virtual int getNOctaveLayers() const = 0;
-
-    CV_WRAP virtual void setContrastThreshold(double contrastThreshold) = 0;
-    CV_WRAP virtual double getContrastThreshold() const = 0;
-
-    CV_WRAP virtual void setEdgeThreshold(double edgeThreshold) = 0;
-    CV_WRAP virtual double getEdgeThreshold() const = 0;
-
-    CV_WRAP virtual void setSigma(double sigma) = 0;
-    CV_WRAP virtual double getSigma() const = 0;
 };
 
 typedef SIFT SiftFeatureDetector;
@@ -389,20 +384,14 @@ public:
     /** @brief Set detection threshold.
     @param threshold AGAST detection threshold score.
     */
-    CV_WRAP virtual void setThreshold(int threshold) = 0;
-    CV_WRAP virtual int getThreshold() const = 0;
+    CV_WRAP virtual void setThreshold(int threshold) { CV_UNUSED(threshold); return; }
+    CV_WRAP virtual int getThreshold() const { return -1; }
 
     /** @brief Set detection octaves.
     @param octaves detection octaves. Use 0 to do single scale.
     */
-    CV_WRAP virtual void setOctaves(int octaves) = 0;
-    CV_WRAP virtual int getOctaves() const = 0;
-    /** @brief Set detection patternScale.
-    @param patternScale apply this scale to the pattern used for sampling the neighbourhood of a
-    keypoint.
-    */
-    CV_WRAP virtual void setPatternScale(float patternScale) = 0;
-    CV_WRAP virtual float getPatternScale() const = 0;
+    CV_WRAP virtual void setOctaves(int octaves) { CV_UNUSED(octaves); return; }
+    CV_WRAP virtual int getOctaves() const { return -1; }
 };
 
 /** @brief Class implementing the ORB (*oriented BRIEF*) keypoint detector and descriptor extractor
@@ -492,7 +481,8 @@ article](http://en.wikipedia.org/wiki/Maximally_stable_extremal_regions)).
 than union-find method; it actually get 1.5~2m/s on my centrino L7200 1.2GHz laptop.
 
 - the color image algorithm is taken from: @cite forssen2007maximally ; it should be much slower
-than grey image method ( 3~4 times )
+than grey image method ( 3~4 times ); the chi_table.h file is taken directly from paper's source
+code which is distributed under GPL.
 
 - (Python) A complete example showing the use of the %MSER detector can be found at samples/python/mser.py
 */
@@ -501,20 +491,20 @@ class CV_EXPORTS_W MSER : public Feature2D
 public:
     /** @brief Full constructor for %MSER detector
 
-    @param delta it compares \f$(size_{i}-size_{i-delta})/size_{i-delta}\f$
-    @param min_area prune the area which smaller than minArea
-    @param max_area prune the area which bigger than maxArea
-    @param max_variation prune the area have similar size to its children
-    @param min_diversity for color image, trace back to cut off mser with diversity less than min_diversity
-    @param max_evolution  for color image, the evolution steps
-    @param area_threshold for color image, the area threshold to cause re-initialize
-    @param min_margin for color image, ignore too small margin
-    @param edge_blur_size for color image, the aperture size for edge blur
+    @param _delta it compares \f$(size_{i}-size_{i-delta})/size_{i-delta}\f$
+    @param _min_area prune the area which smaller than minArea
+    @param _max_area prune the area which bigger than maxArea
+    @param _max_variation prune the area have similar size to its children
+    @param _min_diversity for color image, trace back to cut off mser with diversity less than min_diversity
+    @param _max_evolution  for color image, the evolution steps
+    @param _area_threshold for color image, the area threshold to cause re-initialize
+    @param _min_margin for color image, ignore too small margin
+    @param _edge_blur_size for color image, the aperture size for edge blur
      */
-    CV_WRAP static Ptr<MSER> create( int delta=5, int min_area=60, int max_area=14400,
-          double max_variation=0.25, double min_diversity=.2,
-          int max_evolution=200, double area_threshold=1.01,
-          double min_margin=0.003, int edge_blur_size=5 );
+    CV_WRAP static Ptr<MSER> create( int _delta=5, int _min_area=60, int _max_area=14400,
+          double _max_variation=0.25, double _min_diversity=.2,
+          int _max_evolution=200, double _area_threshold=1.01,
+          double _min_margin=0.003, int _edge_blur_size=5 );
 
     /** @brief Detect %MSER regions
 
@@ -535,27 +525,8 @@ public:
     CV_WRAP virtual void setMaxArea(int maxArea) = 0;
     CV_WRAP virtual int getMaxArea() const = 0;
 
-    CV_WRAP virtual void setMaxVariation(double maxVariation) = 0;
-    CV_WRAP virtual double getMaxVariation() const = 0;
-
-    CV_WRAP virtual void setMinDiversity(double minDiversity) = 0;
-    CV_WRAP virtual double getMinDiversity() const = 0;
-
-    CV_WRAP virtual void setMaxEvolution(int maxEvolution) = 0;
-    CV_WRAP virtual int getMaxEvolution() const = 0;
-
-    CV_WRAP virtual void setAreaThreshold(double areaThreshold) = 0;
-    CV_WRAP virtual double getAreaThreshold() const = 0;
-
-    CV_WRAP virtual void setMinMargin(double min_margin) = 0;
-    CV_WRAP virtual double getMinMargin() const = 0;
-
-    CV_WRAP virtual void setEdgeBlurSize(int edge_blur_size) = 0;
-    CV_WRAP virtual int getEdgeBlurSize() const = 0;
-
     CV_WRAP virtual void setPass2Only(bool f) = 0;
     CV_WRAP virtual bool getPass2Only() const = 0;
-
     CV_WRAP virtual String getDefaultName() const CV_OVERRIDE;
 };
 
@@ -700,9 +671,6 @@ public:
     CV_WRAP virtual void setBlockSize(int blockSize) = 0;
     CV_WRAP virtual int getBlockSize() const = 0;
 
-    CV_WRAP virtual void setGradientSize(int gradientSize_) = 0;
-    CV_WRAP virtual int getGradientSize() = 0;
-
     CV_WRAP virtual void setHarrisDetector(bool val) = 0;
     CV_WRAP virtual bool getHarrisDetector() const = 0;
 
@@ -769,20 +737,13 @@ public:
       CV_PROP_RW bool filterByConvexity;
       CV_PROP_RW float minConvexity, maxConvexity;
 
-      CV_PROP_RW bool collectContours;
-
       void read( const FileNode& fn );
       void write( FileStorage& fs ) const;
   };
 
   CV_WRAP static Ptr<SimpleBlobDetector>
     create(const SimpleBlobDetector::Params &parameters = SimpleBlobDetector::Params());
-
-  CV_WRAP virtual void setParams(const SimpleBlobDetector::Params& params ) = 0;
-  CV_WRAP virtual SimpleBlobDetector::Params getParams() const = 0;
-
   CV_WRAP virtual String getDefaultName() const CV_OVERRIDE;
-  CV_WRAP virtual const std::vector<std::vector<cv::Point> >& getBlobContours() const;
 };
 
 //! @} features2d_main
@@ -1162,7 +1123,7 @@ public:
     that is, copies both parameters and train data. If emptyTrainData is true, the method creates an
     object copy with the current parameters but with empty train data.
      */
-    CV_WRAP CV_NODISCARD_STD virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const = 0;
+    CV_WRAP virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const = 0;
 
     /** @brief Creates a descriptor matcher of a given type with the default parameters (using default
     constructor).
@@ -1181,10 +1142,7 @@ public:
 
 
     // see corresponding cv::Algorithm method
-    CV_WRAP inline void write(FileStorage& fs, const String& name) const { Algorithm::write(fs, name); }
-#if CV_VERSION_MAJOR < 5
-    inline void write(const Ptr<FileStorage>& fs, const String& name) const { CV_Assert(fs); Algorithm::write(*fs, name); }
-#endif
+    CV_WRAP inline void write(const Ptr<FileStorage>& fs, const String& name = String()) const { Algorithm::write(fs, name); }
 
 protected:
     /**
@@ -1203,8 +1161,8 @@ protected:
         virtual void clear();
 
         const Mat& getDescriptors() const;
-        Mat getDescriptor( int imgIdx, int localDescIdx ) const;
-        Mat getDescriptor( int globalDescIdx ) const;
+        const Mat getDescriptor( int imgIdx, int localDescIdx ) const;
+        const Mat getDescriptor( int globalDescIdx ) const;
         void getLocalIdx( int globalDescIdx, int& imgIdx, int& localDescIdx ) const;
 
         int size() const;
@@ -1225,7 +1183,7 @@ protected:
     static bool isPossibleMatch( InputArray mask, int queryIdx, int trainIdx );
     static bool isMaskedOut( InputArrayOfArrays masks, int queryIdx );
 
-    CV_NODISCARD_STD static Mat clone_op( Mat m ) { return m.clone(); }
+    static Mat clone_op( Mat m ) { return m.clone(); }
     void checkMasks( InputArrayOfArrays masks, int queryDescriptorsCount ) const;
 
     //! Collection of descriptors from train images.
@@ -1266,7 +1224,7 @@ public:
      */
     CV_WRAP static Ptr<BFMatcher> create( int normType=NORM_L2, bool crossCheck=false ) ;
 
-    CV_NODISCARD_STD virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const CV_OVERRIDE;
+    virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const CV_OVERRIDE;
 protected:
     virtual void knnMatchImpl( InputArray queryDescriptors, std::vector<std::vector<DMatch> >& matches, int k,
         InputArrayOfArrays masks=noArray(), bool compactResult=false ) CV_OVERRIDE;
@@ -1305,7 +1263,7 @@ public:
 
     CV_WRAP static Ptr<FlannBasedMatcher> create();
 
-    CV_NODISCARD_STD virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const CV_OVERRIDE;
+    virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const CV_OVERRIDE;
 protected:
     static void convertToDMatches( const DescriptorCollection& descriptors,
                                    const Mat& indices, const Mat& distances,
@@ -1397,13 +1355,6 @@ CV_EXPORTS_W void drawMatches( InputArray img1, const std::vector<KeyPoint>& key
                              const std::vector<char>& matchesMask=std::vector<char>(), DrawMatchesFlags flags=DrawMatchesFlags::DEFAULT );
 
 /** @overload */
-CV_EXPORTS_W void drawMatches( InputArray img1, const std::vector<KeyPoint>& keypoints1,
-                             InputArray img2, const std::vector<KeyPoint>& keypoints2,
-                             const std::vector<DMatch>& matches1to2, InputOutputArray outImg,
-                             const int matchesThickness, const Scalar& matchColor=Scalar::all(-1),
-                             const Scalar& singlePointColor=Scalar::all(-1), const std::vector<char>& matchesMask=std::vector<char>(),
-                             DrawMatchesFlags flags=DrawMatchesFlags::DEFAULT );
-
 CV_EXPORTS_AS(drawMatchesKnn) void drawMatches( InputArray img1, const std::vector<KeyPoint>& keypoints1,
                              InputArray img2, const std::vector<KeyPoint>& keypoints2,
                              const std::vector<std::vector<DMatch> >& matches1to2, InputOutputArray outImg,

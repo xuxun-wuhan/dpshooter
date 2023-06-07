@@ -43,17 +43,17 @@ public class JavaCamera2View extends CameraBridgeViewBase {
 
     private static final String LOGTAG = "JavaCamera2View";
 
-    protected ImageReader mImageReader;
-    protected int mPreviewFormat = ImageFormat.YUV_420_888;
+    private ImageReader mImageReader;
+    private int mPreviewFormat = ImageFormat.YUV_420_888;
 
-    protected CameraDevice mCameraDevice;
-    protected CameraCaptureSession mCaptureSession;
-    protected CaptureRequest.Builder mPreviewRequestBuilder;
-    protected String mCameraID;
-    protected android.util.Size mPreviewSize = new android.util.Size(-1, -1);
+    private CameraDevice mCameraDevice;
+    private CameraCaptureSession mCaptureSession;
+    private CaptureRequest.Builder mPreviewRequestBuilder;
+    private String mCameraID;
+    private android.util.Size mPreviewSize = new android.util.Size(-1, -1);
 
     private HandlerThread mBackgroundThread;
-    protected Handler mBackgroundHandler;
+    private Handler mBackgroundHandler;
 
     public JavaCamera2View(Context context, int cameraId) {
         super(context, cameraId);

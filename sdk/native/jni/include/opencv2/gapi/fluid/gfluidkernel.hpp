@@ -25,9 +25,6 @@ namespace cv {
 
 namespace gapi
 {
-/**
- * @brief This namespace contains G-API Fluid backend functions, structures, and symbols.
- */
 namespace fluid
 {
     /**
@@ -181,7 +178,7 @@ template<> struct fluid_get_in<cv::GMat>
 template<> struct fluid_get_in<cv::GScalar>
 {
     // FIXME: change to return by reference when moved to own::Scalar
-    static cv::Scalar get(const cv::GArgs &in_args, int idx)
+    static const cv::Scalar get(const cv::GArgs &in_args, int idx)
     {
         return in_args[idx].unsafe_get<cv::Scalar>();
     }
@@ -248,11 +245,11 @@ struct scratch_helper<false, Impl, Ins...>
                           const cv::GArgs     &,
                           gapi::fluid::Buffer &)
     {
-        GAPI_Error("InternalError");
+        GAPI_Assert(false);
     }
     static void help_reset(gapi::fluid::Buffer &)
     {
-        GAPI_Error("InternalError");
+        GAPI_Assert(false);
     }
 };
 

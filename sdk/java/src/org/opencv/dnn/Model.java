@@ -20,15 +20,25 @@ import org.opencv.utils.Converters;
  * Model creates net from file with trained weights and config,
  * sets preprocessing input and runs forward pass.
  */
-public class Model {
+public class Model extends Net {
 
-    protected final long nativeObj;
-    protected Model(long addr) { nativeObj = addr; }
-
-    public long getNativeObjAddr() { return nativeObj; }
+    protected Model(long addr) { super(addr); }
 
     // internal usage only
     public static Model __fromPtr__(long addr) { return new Model(addr); }
+
+    //
+    // C++:   cv::dnn::Model::Model(Net network)
+    //
+
+    /**
+     * Create model from deep learning network.
+     * @param network Net object.
+     */
+    public Model(Net network) {
+        super(Model_0(network.nativeObj));
+    }
+
 
     //
     // C++:   cv::dnn::Model::Model(String model, String config = "")
@@ -41,7 +51,7 @@ public class Model {
      * @param config Text file contains network configuration.
      */
     public Model(String model, String config) {
-        nativeObj = Model_0(model, config);
+        super(Model_1(model, config));
     }
 
     /**
@@ -50,50 +60,21 @@ public class Model {
      * @param model Binary file contains trained weights.
      */
     public Model(String model) {
-        nativeObj = Model_1(model);
+        super(Model_2(model));
     }
 
 
     //
-    // C++:   cv::dnn::Model::Model(Net network)
+    // C++:  Model cv::dnn::Model::setInputCrop(bool crop)
     //
 
     /**
-     * Create model from deep learning network.
-     * @param network Net object.
-     */
-    public Model(Net network) {
-        nativeObj = Model_2(network.nativeObj);
-    }
-
-
-    //
-    // C++:  Model cv::dnn::Model::setInputSize(Size size)
-    //
-
-    /**
-     * Set input size for frame.
-     * @param size New input size.
-     * <b>Note:</b> If shape of the new blob less than 0, then frame size not change.
+     * Set flag crop for frame.
+     * @param crop Flag which indicates whether image will be cropped after resize or not.
      * @return automatically generated
      */
-    public Model setInputSize(Size size) {
-        return new Model(setInputSize_0(nativeObj, size.width, size.height));
-    }
-
-
-    //
-    // C++:  Model cv::dnn::Model::setInputSize(int width, int height)
-    //
-
-    /**
-     *
-     * @param width New input width.
-     * @param height New input height.
-     * @return automatically generated
-     */
-    public Model setInputSize(int width, int height) {
-        return new Model(setInputSize_1(nativeObj, width, height));
+    public Model setInputCrop(boolean crop) {
+        return new Model(setInputCrop_0(nativeObj, crop));
     }
 
 
@@ -126,16 +107,34 @@ public class Model {
 
 
     //
-    // C++:  Model cv::dnn::Model::setInputCrop(bool crop)
+    // C++:  Model cv::dnn::Model::setInputSize(Size size)
     //
 
     /**
-     * Set flag crop for frame.
-     * @param crop Flag which indicates whether image will be cropped after resize or not.
+     * Set input size for frame.
+     * @param size New input size.
+     * <b>Note:</b> If shape of the new blob less than 0, then frame size not change.
      * @return automatically generated
      */
-    public Model setInputCrop(boolean crop) {
-        return new Model(setInputCrop_0(nativeObj, crop));
+    public Model setInputSize(Size size) {
+        return new Model(setInputSize_0(nativeObj, size.width, size.height));
+    }
+
+
+    //
+    // C++:  Model cv::dnn::Model::setInputSize(int width, int height)
+    //
+
+    /**
+     * Set input size for frame.
+     * @param width New input width.
+     * @param height New input height.
+     * <b>Note:</b> If shape of the new blob less than 0,
+     * then frame size not change.
+     * @return automatically generated
+     */
+    public Model setInputSize(int width, int height) {
+        return new Model(setInputSize_1(nativeObj, width, height));
     }
 
 
@@ -150,6 +149,23 @@ public class Model {
      */
     public Model setInputSwapRB(boolean swapRB) {
         return new Model(setInputSwapRB_0(nativeObj, swapRB));
+    }
+
+
+    //
+    // C++:  void cv::dnn::Model::predict(Mat frame, vector_Mat& outs)
+    //
+
+    /**
+     * Given the {@code input} frame, create input blob, run net and return the output {@code blobs}.
+     * @param outs Allocated output blobs, which will store results of the computation.
+     * @param frame automatically generated
+     */
+    public void predict(Mat frame, List<Mat> outs) {
+        Mat outs_mat = new Mat();
+        predict_0(nativeObj, frame.nativeObj, outs_mat.nativeObj);
+        Converters.Mat_to_vector_Mat(outs_mat, outs);
+        outs_mat.release();
     }
 
 
@@ -221,41 +237,6 @@ public class Model {
     }
 
 
-    //
-    // C++:  void cv::dnn::Model::predict(Mat frame, vector_Mat& outs)
-    //
-
-    /**
-     * Given the {@code input} frame, create input blob, run net and return the output {@code blobs}.
-     * @param outs Allocated output blobs, which will store results of the computation.
-     * @param frame automatically generated
-     */
-    public void predict(Mat frame, List<Mat> outs) {
-        Mat outs_mat = new Mat();
-        predict_0(nativeObj, frame.nativeObj, outs_mat.nativeObj);
-        Converters.Mat_to_vector_Mat(outs_mat, outs);
-        outs_mat.release();
-    }
-
-
-    //
-    // C++:  Model cv::dnn::Model::setPreferableBackend(dnn_Backend backendId)
-    //
-
-    public Model setPreferableBackend(int backendId) {
-        return new Model(setPreferableBackend_0(nativeObj, backendId));
-    }
-
-
-    //
-    // C++:  Model cv::dnn::Model::setPreferableTarget(dnn_Target targetId)
-    //
-
-    public Model setPreferableTarget(int targetId) {
-        return new Model(setPreferableTarget_0(nativeObj, targetId));
-    }
-
-
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -263,18 +244,15 @@ public class Model {
 
 
 
-    // C++:   cv::dnn::Model::Model(String model, String config = "")
-    private static native long Model_0(String model, String config);
-    private static native long Model_1(String model);
-
     // C++:   cv::dnn::Model::Model(Net network)
-    private static native long Model_2(long network_nativeObj);
+    private static native long Model_0(long network_nativeObj);
 
-    // C++:  Model cv::dnn::Model::setInputSize(Size size)
-    private static native long setInputSize_0(long nativeObj, double size_width, double size_height);
+    // C++:   cv::dnn::Model::Model(String model, String config = "")
+    private static native long Model_1(String model, String config);
+    private static native long Model_2(String model);
 
-    // C++:  Model cv::dnn::Model::setInputSize(int width, int height)
-    private static native long setInputSize_1(long nativeObj, int width, int height);
+    // C++:  Model cv::dnn::Model::setInputCrop(bool crop)
+    private static native long setInputCrop_0(long nativeObj, boolean crop);
 
     // C++:  Model cv::dnn::Model::setInputMean(Scalar mean)
     private static native long setInputMean_0(long nativeObj, double mean_val0, double mean_val1, double mean_val2, double mean_val3);
@@ -282,11 +260,17 @@ public class Model {
     // C++:  Model cv::dnn::Model::setInputScale(double scale)
     private static native long setInputScale_0(long nativeObj, double scale);
 
-    // C++:  Model cv::dnn::Model::setInputCrop(bool crop)
-    private static native long setInputCrop_0(long nativeObj, boolean crop);
+    // C++:  Model cv::dnn::Model::setInputSize(Size size)
+    private static native long setInputSize_0(long nativeObj, double size_width, double size_height);
+
+    // C++:  Model cv::dnn::Model::setInputSize(int width, int height)
+    private static native long setInputSize_1(long nativeObj, int width, int height);
 
     // C++:  Model cv::dnn::Model::setInputSwapRB(bool swapRB)
     private static native long setInputSwapRB_0(long nativeObj, boolean swapRB);
+
+    // C++:  void cv::dnn::Model::predict(Mat frame, vector_Mat& outs)
+    private static native void predict_0(long nativeObj, long frame_nativeObj, long outs_mat_nativeObj);
 
     // C++:  void cv::dnn::Model::setInputParams(double scale = 1.0, Size size = Size(), Scalar mean = Scalar(), bool swapRB = false, bool crop = false)
     private static native void setInputParams_0(long nativeObj, double scale, double size_width, double size_height, double mean_val0, double mean_val1, double mean_val2, double mean_val3, boolean swapRB, boolean crop);
@@ -295,15 +279,6 @@ public class Model {
     private static native void setInputParams_3(long nativeObj, double scale, double size_width, double size_height);
     private static native void setInputParams_4(long nativeObj, double scale);
     private static native void setInputParams_5(long nativeObj);
-
-    // C++:  void cv::dnn::Model::predict(Mat frame, vector_Mat& outs)
-    private static native void predict_0(long nativeObj, long frame_nativeObj, long outs_mat_nativeObj);
-
-    // C++:  Model cv::dnn::Model::setPreferableBackend(dnn_Backend backendId)
-    private static native long setPreferableBackend_0(long nativeObj, int backendId);
-
-    // C++:  Model cv::dnn::Model::setPreferableTarget(dnn_Target targetId)
-    private static native long setPreferableTarget_0(long nativeObj, int targetId);
 
     // native support for java finalize()
     private static native void delete(long nativeObj);

@@ -29,36 +29,17 @@ public class Algorithm {
     public static Algorithm __fromPtr__(long addr) { return new Algorithm(addr); }
 
     //
-    // C++:  void cv::Algorithm::clear()
+    // C++:  String cv::Algorithm::getDefaultName()
     //
 
     /**
-     * Clears the algorithm state
+     * Returns the algorithm string identifier.
+     * This string is used as top level xml/yml node tag when the object is saved to a file or string.
+     * @return automatically generated
      */
-    public void clear() {
-        clear_0(nativeObj);
+    public String getDefaultName() {
+        return getDefaultName_0(nativeObj);
     }
-
-
-    //
-    // C++:  void cv::Algorithm::write(FileStorage fs)
-    //
-
-    // Unknown type 'FileStorage' (I), skipping the function
-
-
-    //
-    // C++:  void cv::Algorithm::write(FileStorage fs, String name)
-    //
-
-    // Unknown type 'FileStorage' (I), skipping the function
-
-
-    //
-    // C++:  void cv::Algorithm::read(FileNode fn)
-    //
-
-    // Unknown type 'FileNode' (I), skipping the function
 
 
     //
@@ -72,6 +53,25 @@ public class Algorithm {
     public boolean empty() {
         return empty_0(nativeObj);
     }
+
+
+    //
+    // C++:  void cv::Algorithm::clear()
+    //
+
+    /**
+     * Clears the algorithm state
+     */
+    public void clear() {
+        clear_0(nativeObj);
+    }
+
+
+    //
+    // C++:  void cv::Algorithm::read(FileNode fn)
+    //
+
+    // Unknown type 'FileNode' (I), skipping the function
 
 
     //
@@ -89,17 +89,10 @@ public class Algorithm {
 
 
     //
-    // C++:  String cv::Algorithm::getDefaultName()
+    // C++:  void cv::Algorithm::write(Ptr_FileStorage fs, String name = String())
     //
 
-    /**
-     * Returns the algorithm string identifier.
-     * This string is used as top level xml/yml node tag when the object is saved to a file or string.
-     * @return automatically generated
-     */
-    public String getDefaultName() {
-        return getDefaultName_0(nativeObj);
-    }
+    // Unknown type 'Ptr_FileStorage' (I), skipping the function
 
 
     @Override
@@ -109,17 +102,17 @@ public class Algorithm {
 
 
 
-    // C++:  void cv::Algorithm::clear()
-    private static native void clear_0(long nativeObj);
+    // C++:  String cv::Algorithm::getDefaultName()
+    private static native String getDefaultName_0(long nativeObj);
 
     // C++:  bool cv::Algorithm::empty()
     private static native boolean empty_0(long nativeObj);
 
+    // C++:  void cv::Algorithm::clear()
+    private static native void clear_0(long nativeObj);
+
     // C++:  void cv::Algorithm::save(String filename)
     private static native void save_0(long nativeObj, String filename);
-
-    // C++:  String cv::Algorithm::getDefaultName()
-    private static native String getDefaultName_0(long nativeObj);
 
     // native support for java finalize()
     private static native void delete(long nativeObj);

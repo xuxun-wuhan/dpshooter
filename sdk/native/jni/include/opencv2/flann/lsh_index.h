@@ -42,6 +42,7 @@
 #include <map>
 #include <vector>
 
+#include "general.h"
 #include "nn_index.h"
 #include "matrix.h"
 #include "result_set.h"

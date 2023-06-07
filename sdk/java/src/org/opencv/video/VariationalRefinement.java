@@ -27,19 +27,71 @@ public class VariationalRefinement extends DenseOpticalFlow {
     public static VariationalRefinement __fromPtr__(long addr) { return new VariationalRefinement(addr); }
 
     //
-    // C++:  void cv::VariationalRefinement::calcUV(Mat I0, Mat I1, Mat& flow_u, Mat& flow_v)
+    // C++: static Ptr_VariationalRefinement cv::VariationalRefinement::create()
     //
 
     /**
-     * REF: calc function overload to handle separate horizontal (u) and vertical (v) flow components
-     * (to avoid extra splits/merges)
-     * @param I0 automatically generated
-     * @param I1 automatically generated
-     * @param flow_u automatically generated
-     * @param flow_v automatically generated
+     * Creates an instance of VariationalRefinement
+     * @return automatically generated
      */
-    public void calcUV(Mat I0, Mat I1, Mat flow_u, Mat flow_v) {
-        calcUV_0(nativeObj, I0.nativeObj, I1.nativeObj, flow_u.nativeObj, flow_v.nativeObj);
+    public static VariationalRefinement create() {
+        return VariationalRefinement.__fromPtr__(create_0());
+    }
+
+
+    //
+    // C++:  float cv::VariationalRefinement::getAlpha()
+    //
+
+    /**
+     * Weight of the smoothness term
+     * SEE: setAlpha
+     * @return automatically generated
+     */
+    public float getAlpha() {
+        return getAlpha_0(nativeObj);
+    }
+
+
+    //
+    // C++:  float cv::VariationalRefinement::getDelta()
+    //
+
+    /**
+     * Weight of the color constancy term
+     * SEE: setDelta
+     * @return automatically generated
+     */
+    public float getDelta() {
+        return getDelta_0(nativeObj);
+    }
+
+
+    //
+    // C++:  float cv::VariationalRefinement::getGamma()
+    //
+
+    /**
+     * Weight of the gradient constancy term
+     * SEE: setGamma
+     * @return automatically generated
+     */
+    public float getGamma() {
+        return getGamma_0(nativeObj);
+    }
+
+
+    //
+    // C++:  float cv::VariationalRefinement::getOmega()
+    //
+
+    /**
+     * Relaxation factor in SOR
+     * SEE: setOmega
+     * @return automatically generated
+     */
+    public float getOmega() {
+        return getOmega_0(nativeObj);
     }
 
 
@@ -54,19 +106,6 @@ public class VariationalRefinement extends DenseOpticalFlow {
      */
     public int getFixedPointIterations() {
         return getFixedPointIterations_0(nativeObj);
-    }
-
-
-    //
-    // C++:  void cv::VariationalRefinement::setFixedPointIterations(int val)
-    //
-
-    /**
-     *  getFixedPointIterations SEE: getFixedPointIterations
-     * @param val automatically generated
-     */
-    public void setFixedPointIterations(int val) {
-        setFixedPointIterations_0(nativeObj, val);
     }
 
 
@@ -86,56 +125,19 @@ public class VariationalRefinement extends DenseOpticalFlow {
 
 
     //
-    // C++:  void cv::VariationalRefinement::setSorIterations(int val)
+    // C++:  void cv::VariationalRefinement::calcUV(Mat I0, Mat I1, Mat& flow_u, Mat& flow_v)
     //
 
     /**
-     *  getSorIterations SEE: getSorIterations
-     * @param val automatically generated
+     * REF: calc function overload to handle separate horizontal (u) and vertical (v) flow components
+     * (to avoid extra splits/merges)
+     * @param I0 automatically generated
+     * @param I1 automatically generated
+     * @param flow_u automatically generated
+     * @param flow_v automatically generated
      */
-    public void setSorIterations(int val) {
-        setSorIterations_0(nativeObj, val);
-    }
-
-
-    //
-    // C++:  float cv::VariationalRefinement::getOmega()
-    //
-
-    /**
-     * Relaxation factor in SOR
-     * SEE: setOmega
-     * @return automatically generated
-     */
-    public float getOmega() {
-        return getOmega_0(nativeObj);
-    }
-
-
-    //
-    // C++:  void cv::VariationalRefinement::setOmega(float val)
-    //
-
-    /**
-     *  getOmega SEE: getOmega
-     * @param val automatically generated
-     */
-    public void setOmega(float val) {
-        setOmega_0(nativeObj, val);
-    }
-
-
-    //
-    // C++:  float cv::VariationalRefinement::getAlpha()
-    //
-
-    /**
-     * Weight of the smoothness term
-     * SEE: setAlpha
-     * @return automatically generated
-     */
-    public float getAlpha() {
-        return getAlpha_0(nativeObj);
+    public void calcUV(Mat I0, Mat I1, Mat flow_u, Mat flow_v) {
+        calcUV_0(nativeObj, I0.nativeObj, I1.nativeObj, flow_u.nativeObj, flow_v.nativeObj);
     }
 
 
@@ -153,20 +155,6 @@ public class VariationalRefinement extends DenseOpticalFlow {
 
 
     //
-    // C++:  float cv::VariationalRefinement::getDelta()
-    //
-
-    /**
-     * Weight of the color constancy term
-     * SEE: setDelta
-     * @return automatically generated
-     */
-    public float getDelta() {
-        return getDelta_0(nativeObj);
-    }
-
-
-    //
     // C++:  void cv::VariationalRefinement::setDelta(float val)
     //
 
@@ -180,16 +168,15 @@ public class VariationalRefinement extends DenseOpticalFlow {
 
 
     //
-    // C++:  float cv::VariationalRefinement::getGamma()
+    // C++:  void cv::VariationalRefinement::setFixedPointIterations(int val)
     //
 
     /**
-     * Weight of the gradient constancy term
-     * SEE: setGamma
-     * @return automatically generated
+     *  getFixedPointIterations SEE: getFixedPointIterations
+     * @param val automatically generated
      */
-    public float getGamma() {
-        return getGamma_0(nativeObj);
+    public void setFixedPointIterations(int val) {
+        setFixedPointIterations_0(nativeObj, val);
     }
 
 
@@ -207,15 +194,28 @@ public class VariationalRefinement extends DenseOpticalFlow {
 
 
     //
-    // C++: static Ptr_VariationalRefinement cv::VariationalRefinement::create()
+    // C++:  void cv::VariationalRefinement::setOmega(float val)
     //
 
     /**
-     * Creates an instance of VariationalRefinement
-     * @return automatically generated
+     *  getOmega SEE: getOmega
+     * @param val automatically generated
      */
-    public static VariationalRefinement create() {
-        return VariationalRefinement.__fromPtr__(create_0());
+    public void setOmega(float val) {
+        setOmega_0(nativeObj, val);
+    }
+
+
+    //
+    // C++:  void cv::VariationalRefinement::setSorIterations(int val)
+    //
+
+    /**
+     *  getSorIterations SEE: getSorIterations
+     * @param val automatically generated
+     */
+    public void setSorIterations(int val) {
+        setSorIterations_0(nativeObj, val);
     }
 
 
@@ -226,47 +226,47 @@ public class VariationalRefinement extends DenseOpticalFlow {
 
 
 
-    // C++:  void cv::VariationalRefinement::calcUV(Mat I0, Mat I1, Mat& flow_u, Mat& flow_v)
-    private static native void calcUV_0(long nativeObj, long I0_nativeObj, long I1_nativeObj, long flow_u_nativeObj, long flow_v_nativeObj);
-
-    // C++:  int cv::VariationalRefinement::getFixedPointIterations()
-    private static native int getFixedPointIterations_0(long nativeObj);
-
-    // C++:  void cv::VariationalRefinement::setFixedPointIterations(int val)
-    private static native void setFixedPointIterations_0(long nativeObj, int val);
-
-    // C++:  int cv::VariationalRefinement::getSorIterations()
-    private static native int getSorIterations_0(long nativeObj);
-
-    // C++:  void cv::VariationalRefinement::setSorIterations(int val)
-    private static native void setSorIterations_0(long nativeObj, int val);
-
-    // C++:  float cv::VariationalRefinement::getOmega()
-    private static native float getOmega_0(long nativeObj);
-
-    // C++:  void cv::VariationalRefinement::setOmega(float val)
-    private static native void setOmega_0(long nativeObj, float val);
+    // C++: static Ptr_VariationalRefinement cv::VariationalRefinement::create()
+    private static native long create_0();
 
     // C++:  float cv::VariationalRefinement::getAlpha()
     private static native float getAlpha_0(long nativeObj);
 
-    // C++:  void cv::VariationalRefinement::setAlpha(float val)
-    private static native void setAlpha_0(long nativeObj, float val);
-
     // C++:  float cv::VariationalRefinement::getDelta()
     private static native float getDelta_0(long nativeObj);
-
-    // C++:  void cv::VariationalRefinement::setDelta(float val)
-    private static native void setDelta_0(long nativeObj, float val);
 
     // C++:  float cv::VariationalRefinement::getGamma()
     private static native float getGamma_0(long nativeObj);
 
+    // C++:  float cv::VariationalRefinement::getOmega()
+    private static native float getOmega_0(long nativeObj);
+
+    // C++:  int cv::VariationalRefinement::getFixedPointIterations()
+    private static native int getFixedPointIterations_0(long nativeObj);
+
+    // C++:  int cv::VariationalRefinement::getSorIterations()
+    private static native int getSorIterations_0(long nativeObj);
+
+    // C++:  void cv::VariationalRefinement::calcUV(Mat I0, Mat I1, Mat& flow_u, Mat& flow_v)
+    private static native void calcUV_0(long nativeObj, long I0_nativeObj, long I1_nativeObj, long flow_u_nativeObj, long flow_v_nativeObj);
+
+    // C++:  void cv::VariationalRefinement::setAlpha(float val)
+    private static native void setAlpha_0(long nativeObj, float val);
+
+    // C++:  void cv::VariationalRefinement::setDelta(float val)
+    private static native void setDelta_0(long nativeObj, float val);
+
+    // C++:  void cv::VariationalRefinement::setFixedPointIterations(int val)
+    private static native void setFixedPointIterations_0(long nativeObj, int val);
+
     // C++:  void cv::VariationalRefinement::setGamma(float val)
     private static native void setGamma_0(long nativeObj, float val);
 
-    // C++: static Ptr_VariationalRefinement cv::VariationalRefinement::create()
-    private static native long create_0();
+    // C++:  void cv::VariationalRefinement::setOmega(float val)
+    private static native void setOmega_0(long nativeObj, float val);
+
+    // C++:  void cv::VariationalRefinement::setSorIterations(int val)
+    private static native void setSorIterations_0(long nativeObj, int val);
 
     // native support for java finalize()
     private static native void delete(long nativeObj);

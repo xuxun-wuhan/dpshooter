@@ -27,27 +27,46 @@ public class VideoWriter {
     public static VideoWriter __fromPtr__(long addr) { return new VideoWriter(addr); }
 
     //
-    // C++:   cv::VideoWriter::VideoWriter()
+    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
     //
 
     /**
-     * Default constructors
      *
-     *     The constructors/functions initialize video writers.
-     * <ul>
-     *   <li>
-     *        On Linux FFMPEG is used to write videos;
-     *   </li>
-     *   <li>
-     *        On Windows FFMPEG or MSWF or DSHOW is used;
-     *   </li>
-     *   <li>
-     *        On MacOSX AVFoundation is used.
-     *   </li>
-     * </ul>
+     *     The {@code apiPreference} parameter allows to specify API backends to use. Can be used to enforce a specific reader implementation
+     *     if multiple are available: e.g. cv::CAP_FFMPEG or cv::CAP_GSTREAMER.
+     * @param filename automatically generated
+     * @param apiPreference automatically generated
+     * @param fourcc automatically generated
+     * @param fps automatically generated
+     * @param frameSize automatically generated
+     * @param isColor automatically generated
      */
-    public VideoWriter() {
-        nativeObj = VideoWriter_0();
+    public VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, boolean isColor) {
+        nativeObj = VideoWriter_0(filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, isColor);
+    }
+
+    /**
+     *
+     *     The {@code apiPreference} parameter allows to specify API backends to use. Can be used to enforce a specific reader implementation
+     *     if multiple are available: e.g. cv::CAP_FFMPEG or cv::CAP_GSTREAMER.
+     * @param filename automatically generated
+     * @param apiPreference automatically generated
+     * @param fourcc automatically generated
+     * @param fps automatically generated
+     * @param frameSize automatically generated
+     */
+    public VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize) {
+        nativeObj = VideoWriter_1(filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height);
+    }
+
+
+    //
+    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
+    //
+
+    public VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, MatOfInt params) {
+        Mat params_mat = params;
+        nativeObj = VideoWriter_2(filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, params_mat.nativeObj);
     }
 
 
@@ -59,11 +78,9 @@ public class VideoWriter {
      *
      *     @param filename Name of the output video file.
      *     @param fourcc 4-character code of codec used to compress the frames. For example,
-     *     VideoWriter::fourcc('P','I','M','1') is a MPEG-1 codec, VideoWriter::fourcc('M','J','P','G')
-     *     is a motion-jpeg codec etc. List of codes can be obtained at
-     *     [MSDN](https://docs.microsoft.com/en-us/windows/win32/medfound/video-fourccs) page
-     *     or with this [archived page](https://web.archive.org/web/20220316062600/http://www.fourcc.org/codecs.php)
-     *     of the fourcc site for a more complete list). FFMPEG backend with MP4 container natively uses
+     *     VideoWriter::fourcc('P','I','M','1') is a MPEG-1 codec, VideoWriter::fourcc('M','J','P','G') is a
+     *     motion-jpeg codec etc. List of codes can be obtained at [Video Codecs by
+     *     FOURCC](http://www.fourcc.org/codecs.php) page. FFMPEG backend with MP4 container natively uses
      *     other values as fourcc code: see [ObjectType](http://mp4ra.org/#/codecs),
      *     so you may receive a warning message from OpenCV about fourcc code conversion.
      *     @param fps Framerate of the created video stream.
@@ -90,18 +107,16 @@ public class VideoWriter {
      * </ul>
      */
     public VideoWriter(String filename, int fourcc, double fps, Size frameSize, boolean isColor) {
-        nativeObj = VideoWriter_1(filename, fourcc, fps, frameSize.width, frameSize.height, isColor);
+        nativeObj = VideoWriter_3(filename, fourcc, fps, frameSize.width, frameSize.height, isColor);
     }
 
     /**
      *
      *     @param filename Name of the output video file.
      *     @param fourcc 4-character code of codec used to compress the frames. For example,
-     *     VideoWriter::fourcc('P','I','M','1') is a MPEG-1 codec, VideoWriter::fourcc('M','J','P','G')
-     *     is a motion-jpeg codec etc. List of codes can be obtained at
-     *     [MSDN](https://docs.microsoft.com/en-us/windows/win32/medfound/video-fourccs) page
-     *     or with this [archived page](https://web.archive.org/web/20220316062600/http://www.fourcc.org/codecs.php)
-     *     of the fourcc site for a more complete list). FFMPEG backend with MP4 container natively uses
+     *     VideoWriter::fourcc('P','I','M','1') is a MPEG-1 codec, VideoWriter::fourcc('M','J','P','G') is a
+     *     motion-jpeg codec etc. List of codes can be obtained at [Video Codecs by
+     *     FOURCC](http://www.fourcc.org/codecs.php) page. FFMPEG backend with MP4 container natively uses
      *     other values as fourcc code: see [ObjectType](http://mp4ra.org/#/codecs),
      *     so you may receive a warning message from OpenCV about fourcc code conversion.
      *     @param fps Framerate of the created video stream.
@@ -127,41 +142,7 @@ public class VideoWriter {
      * </ul>
      */
     public VideoWriter(String filename, int fourcc, double fps, Size frameSize) {
-        nativeObj = VideoWriter_2(filename, fourcc, fps, frameSize.width, frameSize.height);
-    }
-
-
-    //
-    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
-    //
-
-    /**
-     *
-     *     The {@code apiPreference} parameter allows to specify API backends to use. Can be used to enforce a specific reader implementation
-     *     if multiple are available: e.g. cv::CAP_FFMPEG or cv::CAP_GSTREAMER.
-     * @param filename automatically generated
-     * @param apiPreference automatically generated
-     * @param fourcc automatically generated
-     * @param fps automatically generated
-     * @param frameSize automatically generated
-     * @param isColor automatically generated
-     */
-    public VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, boolean isColor) {
-        nativeObj = VideoWriter_3(filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, isColor);
-    }
-
-    /**
-     *
-     *     The {@code apiPreference} parameter allows to specify API backends to use. Can be used to enforce a specific reader implementation
-     *     if multiple are available: e.g. cv::CAP_FFMPEG or cv::CAP_GSTREAMER.
-     * @param filename automatically generated
-     * @param apiPreference automatically generated
-     * @param fourcc automatically generated
-     * @param fps automatically generated
-     * @param frameSize automatically generated
-     */
-    public VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize) {
-        nativeObj = VideoWriter_4(filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height);
+        nativeObj = VideoWriter_4(filename, fourcc, fps, frameSize.width, frameSize.height);
     }
 
 
@@ -186,12 +167,78 @@ public class VideoWriter {
 
 
     //
-    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
+    // C++:   cv::VideoWriter::VideoWriter()
     //
 
-    public VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, MatOfInt params) {
+    /**
+     * Default constructors
+     *
+     *     The constructors/functions initialize video writers.
+     * <ul>
+     *   <li>
+     *        On Linux FFMPEG is used to write videos;
+     *   </li>
+     *   <li>
+     *        On Windows FFMPEG or MSWF or DSHOW is used;
+     *   </li>
+     *   <li>
+     *        On MacOSX AVFoundation is used.
+     *   </li>
+     * </ul>
+     */
+    public VideoWriter() {
+        nativeObj = VideoWriter_6();
+    }
+
+
+    //
+    // C++:  String cv::VideoWriter::getBackendName()
+    //
+
+    /**
+     * Returns used backend API name
+     *
+     *      <b>Note:</b> Stream should be opened.
+     * @return automatically generated
+     */
+    public String getBackendName() {
+        return getBackendName_0(nativeObj);
+    }
+
+
+    //
+    // C++:  bool cv::VideoWriter::isOpened()
+    //
+
+    /**
+     * Returns true if video writer has been successfully initialized.
+     * @return automatically generated
+     */
+    public boolean isOpened() {
+        return isOpened_0(nativeObj);
+    }
+
+
+    //
+    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
+    //
+
+    public boolean open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, boolean isColor) {
+        return open_0(nativeObj, filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, isColor);
+    }
+
+    public boolean open(String filename, int apiPreference, int fourcc, double fps, Size frameSize) {
+        return open_1(nativeObj, filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height);
+    }
+
+
+    //
+    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
+    //
+
+    public boolean open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, MatOfInt params) {
         Mat params_mat = params;
-        nativeObj = VideoWriter_6(filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, params_mat.nativeObj);
+        return open_2(nativeObj, filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, params_mat.nativeObj);
     }
 
 
@@ -214,7 +261,7 @@ public class VideoWriter {
      * @param isColor automatically generated
      */
     public boolean open(String filename, int fourcc, double fps, Size frameSize, boolean isColor) {
-        return open_0(nativeObj, filename, fourcc, fps, frameSize.width, frameSize.height, isColor);
+        return open_3(nativeObj, filename, fourcc, fps, frameSize.width, frameSize.height, isColor);
     }
 
     /**
@@ -231,20 +278,7 @@ public class VideoWriter {
      * @param frameSize automatically generated
      */
     public boolean open(String filename, int fourcc, double fps, Size frameSize) {
-        return open_1(nativeObj, filename, fourcc, fps, frameSize.width, frameSize.height);
-    }
-
-
-    //
-    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
-    //
-
-    public boolean open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, boolean isColor) {
-        return open_2(nativeObj, filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, isColor);
-    }
-
-    public boolean open(String filename, int apiPreference, int fourcc, double fps, Size frameSize) {
-        return open_3(nativeObj, filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height);
+        return open_4(nativeObj, filename, fourcc, fps, frameSize.width, frameSize.height);
     }
 
 
@@ -254,62 +288,7 @@ public class VideoWriter {
 
     public boolean open(String filename, int fourcc, double fps, Size frameSize, MatOfInt params) {
         Mat params_mat = params;
-        return open_4(nativeObj, filename, fourcc, fps, frameSize.width, frameSize.height, params_mat.nativeObj);
-    }
-
-
-    //
-    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
-    //
-
-    public boolean open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, MatOfInt params) {
-        Mat params_mat = params;
-        return open_5(nativeObj, filename, apiPreference, fourcc, fps, frameSize.width, frameSize.height, params_mat.nativeObj);
-    }
-
-
-    //
-    // C++:  bool cv::VideoWriter::isOpened()
-    //
-
-    /**
-     * Returns true if video writer has been successfully initialized.
-     * @return automatically generated
-     */
-    public boolean isOpened() {
-        return isOpened_0(nativeObj);
-    }
-
-
-    //
-    // C++:  void cv::VideoWriter::release()
-    //
-
-    /**
-     * Closes the video writer.
-     *
-     *     The method is automatically called by subsequent VideoWriter::open and by the VideoWriter
-     *     destructor.
-     */
-    public void release() {
-        release_0(nativeObj);
-    }
-
-
-    //
-    // C++:  void cv::VideoWriter::write(Mat image)
-    //
-
-    /**
-     * Writes the next video frame
-     *
-     *     @param image The written frame. In general, color images are expected in BGR format.
-     *
-     *     The function/method writes the specified image to video file. It must have the same size as has
-     *     been specified when opening the video writer.
-     */
-    public void write(Mat image) {
-        write_0(nativeObj, image.nativeObj);
+        return open_5(nativeObj, filename, fourcc, fps, frameSize.width, frameSize.height, params_mat.nativeObj);
     }
 
 
@@ -371,17 +350,34 @@ public class VideoWriter {
 
 
     //
-    // C++:  String cv::VideoWriter::getBackendName()
+    // C++:  void cv::VideoWriter::release()
     //
 
     /**
-     * Returns used backend API name
+     * Closes the video writer.
      *
-     *      <b>Note:</b> Stream should be opened.
-     * @return automatically generated
+     *     The method is automatically called by subsequent VideoWriter::open and by the VideoWriter
+     *     destructor.
      */
-    public String getBackendName() {
-        return getBackendName_0(nativeObj);
+    public void release() {
+        release_0(nativeObj);
+    }
+
+
+    //
+    // C++:  void cv::VideoWriter::write(Mat image)
+    //
+
+    /**
+     * Writes the next video frame
+     *
+     *     @param image The written frame. In general, color images are expected in BGR format.
+     *
+     *     The function/method writes the specified image to video file. It must have the same size as has
+     *     been specified when opening the video writer.
+     */
+    public void write(Mat image) {
+        write_0(nativeObj, image.nativeObj);
     }
 
 
@@ -392,45 +388,42 @@ public class VideoWriter {
 
 
 
-    // C++:   cv::VideoWriter::VideoWriter()
-    private static native long VideoWriter_0();
+    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
+    private static native long VideoWriter_0(String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
+    private static native long VideoWriter_1(String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height);
+
+    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
+    private static native long VideoWriter_2(String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, long params_mat_nativeObj);
 
     // C++:   cv::VideoWriter::VideoWriter(String filename, int fourcc, double fps, Size frameSize, bool isColor = true)
-    private static native long VideoWriter_1(String filename, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
-    private static native long VideoWriter_2(String filename, int fourcc, double fps, double frameSize_width, double frameSize_height);
-
-    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
-    private static native long VideoWriter_3(String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
-    private static native long VideoWriter_4(String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height);
+    private static native long VideoWriter_3(String filename, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
+    private static native long VideoWriter_4(String filename, int fourcc, double fps, double frameSize_width, double frameSize_height);
 
     // C++:   cv::VideoWriter::VideoWriter(String filename, int fourcc, double fps, Size frameSize, vector_int params)
     private static native long VideoWriter_5(String filename, int fourcc, double fps, double frameSize_width, double frameSize_height, long params_mat_nativeObj);
 
-    // C++:   cv::VideoWriter::VideoWriter(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
-    private static native long VideoWriter_6(String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, long params_mat_nativeObj);
+    // C++:   cv::VideoWriter::VideoWriter()
+    private static native long VideoWriter_6();
 
-    // C++:  bool cv::VideoWriter::open(String filename, int fourcc, double fps, Size frameSize, bool isColor = true)
-    private static native boolean open_0(long nativeObj, String filename, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
-    private static native boolean open_1(long nativeObj, String filename, int fourcc, double fps, double frameSize_width, double frameSize_height);
-
-    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
-    private static native boolean open_2(long nativeObj, String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
-    private static native boolean open_3(long nativeObj, String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height);
-
-    // C++:  bool cv::VideoWriter::open(String filename, int fourcc, double fps, Size frameSize, vector_int params)
-    private static native boolean open_4(long nativeObj, String filename, int fourcc, double fps, double frameSize_width, double frameSize_height, long params_mat_nativeObj);
-
-    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
-    private static native boolean open_5(long nativeObj, String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, long params_mat_nativeObj);
+    // C++:  String cv::VideoWriter::getBackendName()
+    private static native String getBackendName_0(long nativeObj);
 
     // C++:  bool cv::VideoWriter::isOpened()
     private static native boolean isOpened_0(long nativeObj);
 
-    // C++:  void cv::VideoWriter::release()
-    private static native void release_0(long nativeObj);
+    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, bool isColor = true)
+    private static native boolean open_0(long nativeObj, String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
+    private static native boolean open_1(long nativeObj, String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height);
 
-    // C++:  void cv::VideoWriter::write(Mat image)
-    private static native void write_0(long nativeObj, long image_nativeObj);
+    // C++:  bool cv::VideoWriter::open(String filename, int apiPreference, int fourcc, double fps, Size frameSize, vector_int params)
+    private static native boolean open_2(long nativeObj, String filename, int apiPreference, int fourcc, double fps, double frameSize_width, double frameSize_height, long params_mat_nativeObj);
+
+    // C++:  bool cv::VideoWriter::open(String filename, int fourcc, double fps, Size frameSize, bool isColor = true)
+    private static native boolean open_3(long nativeObj, String filename, int fourcc, double fps, double frameSize_width, double frameSize_height, boolean isColor);
+    private static native boolean open_4(long nativeObj, String filename, int fourcc, double fps, double frameSize_width, double frameSize_height);
+
+    // C++:  bool cv::VideoWriter::open(String filename, int fourcc, double fps, Size frameSize, vector_int params)
+    private static native boolean open_5(long nativeObj, String filename, int fourcc, double fps, double frameSize_width, double frameSize_height, long params_mat_nativeObj);
 
     // C++:  bool cv::VideoWriter::set(int propId, double value)
     private static native boolean set_0(long nativeObj, int propId, double value);
@@ -441,8 +434,11 @@ public class VideoWriter {
     // C++: static int cv::VideoWriter::fourcc(char c1, char c2, char c3, char c4)
     private static native int fourcc_0(char c1, char c2, char c3, char c4);
 
-    // C++:  String cv::VideoWriter::getBackendName()
-    private static native String getBackendName_0(long nativeObj);
+    // C++:  void cv::VideoWriter::release()
+    private static native void release_0(long nativeObj);
+
+    // C++:  void cv::VideoWriter::write(Mat image)
+    private static native void write_0(long nativeObj, long image_nativeObj);
 
     // native support for java finalize()
     private static native void delete(long nativeObj);

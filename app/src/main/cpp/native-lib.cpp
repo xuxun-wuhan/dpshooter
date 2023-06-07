@@ -3,6 +3,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/video/tracking.hpp>
+#include <opencv2/optflow.hpp>
 
 using namespace cv;
 
@@ -43,7 +44,7 @@ Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
 
     // Calculate optical flow on the lower resolution images
     Mat flow_small;
-    Ptr<DenseOpticalFlow> opticalFlowCalculator = FarnebackOpticalFlow::create();
+    Ptr<DenseOpticalFlow> opticalFlowCalculator = cv::optflow::createOptFlow_SparseToDense();
     opticalFlowCalculator->calc(img1_small, img2_small, flow_small);
 
     // Resize flow back to the original size

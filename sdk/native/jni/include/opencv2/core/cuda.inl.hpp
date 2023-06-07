@@ -75,11 +75,6 @@ GpuMat::GpuMat(Size size_, int type_, Allocator* allocator_)
         create(size_.height, size_.width, type_);
 }
 
-// WARNING: unreachable code using Ninja
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(push)
-#pragma warning(disable: 4702)
-#endif
 inline
 GpuMat::GpuMat(int rows_, int cols_, int type_, Scalar s_, Allocator* allocator_)
     : flags(0), rows(0), cols(0), step(0), data(0), refcount(0), datastart(0), dataend(0), allocator(allocator_)
@@ -101,9 +96,6 @@ GpuMat::GpuMat(Size size_, int type_, Scalar s_, Allocator* allocator_)
         setTo(s_);
     }
 }
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(pop)
-#endif
 
 inline
 GpuMat::GpuMat(const GpuMat& m)
@@ -166,19 +158,11 @@ GpuMat GpuMat::clone() const
     return m;
 }
 
-// WARNING: unreachable code using Ninja
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(push)
-#pragma warning(disable: 4702)
-#endif
 inline
 void GpuMat::copyTo(OutputArray dst, InputArray mask) const
 {
     copyTo(dst, mask, Stream::Null());
 }
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(pop)
-#endif
 
 inline
 GpuMat& GpuMat::setTo(Scalar s)
@@ -192,11 +176,6 @@ GpuMat& GpuMat::setTo(Scalar s, InputArray mask)
     return setTo(s, mask, Stream::Null());
 }
 
-// WARNING: unreachable code using Ninja
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(push)
-#pragma warning(disable: 4702)
-#endif
 inline
 void GpuMat::convertTo(OutputArray dst, int rtype) const
 {
@@ -208,9 +187,6 @@ void GpuMat::convertTo(OutputArray dst, int rtype, double alpha, double beta) co
 {
     convertTo(dst, rtype, alpha, beta, Stream::Null());
 }
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(pop)
-#endif
 
 inline
 void GpuMat::convertTo(OutputArray dst, int rtype, double alpha, Stream& stream) const
@@ -408,92 +384,6 @@ void swap(GpuMat& a, GpuMat& b)
 }
 
 //===================================================================================
-// GpuMatND
-//===================================================================================
-
-inline
-GpuMatND::GpuMatND() :
-    flags(0), dims(0), data(nullptr), offset(0)
-{
-}
-
-inline
-GpuMatND::GpuMatND(SizeArray _size, int _type) :
-    flags(0), dims(0), data(nullptr), offset(0)
-{
-    create(std::move(_size), _type);
-}
-
-inline
-void GpuMatND::swap(GpuMatND& m) noexcept
-{
-    std::swap(*this, m);
-}
-
-inline
-bool GpuMatND::isContinuous() const
-{
-    return (flags & Mat::CONTINUOUS_FLAG) != 0;
-}
-
-inline
-bool GpuMatND::isSubmatrix() const
-{
-    return (flags & Mat::SUBMATRIX_FLAG) != 0;
-}
-
-inline
-size_t GpuMatND::elemSize() const
-{
-    return CV_ELEM_SIZE(flags);
-}
-
-inline
-size_t GpuMatND::elemSize1() const
-{
-    return CV_ELEM_SIZE1(flags);
-}
-
-inline
-bool GpuMatND::empty() const
-{
-    return data == nullptr;
-}
-
-inline
-bool GpuMatND::external() const
-{
-    return !empty() && data_.use_count() == 0;
-}
-
-inline
-uchar* GpuMatND::getDevicePtr() const
-{
-    return data + offset;
-}
-
-inline
-size_t GpuMatND::total() const
-{
-    size_t p = 1;
-    for(auto s : size)
-        p *= s;
-    return p;
-}
-
-inline
-size_t GpuMatND::totalMemSize() const
-{
-    return size[0] * step[0];
-}
-
-inline
-int GpuMatND::type() const
-{
-    return CV_MAT_TYPE(flags);
-}
-
-//===================================================================================
 // HostMem
 //===================================================================================
 
@@ -670,11 +560,6 @@ Event::Event(const Ptr<Impl>& impl)
 // Initialization & Info
 //===================================================================================
 
-// WARNING: unreachable code using Ninja
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(push)
-#pragma warning(disable: 4702)
-#endif
 inline
 bool TargetArchs::has(int major, int minor)
 {
@@ -692,9 +577,6 @@ DeviceInfo::DeviceInfo()
 {
     device_id_ = getDevice();
 }
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(pop)
-#endif
 
 inline
 DeviceInfo::DeviceInfo(int device_id)
@@ -703,11 +585,6 @@ DeviceInfo::DeviceInfo(int device_id)
     device_id_ = device_id;
 }
 
-// WARNING: unreachable code using Ninja
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(push)
-#pragma warning(disable: 4702)
-#endif
 inline
 int DeviceInfo::deviceID() const
 {
@@ -736,9 +613,6 @@ bool DeviceInfo::supports(FeatureSet feature_set) const
     int version = majorVersion() * 10 + minorVersion();
     return version >= feature_set;
 }
-#if defined _MSC_VER && _MSC_VER >= 1920
-#pragma warning(pop)
-#endif
 
 
 }} // namespace cv { namespace cuda {

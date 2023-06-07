@@ -34,6 +34,7 @@
 
 #include <sstream>
 
+#include "general.h"
 #include "nn_index.h"
 #include "ground_truth.h"
 #include "index_testing.h"

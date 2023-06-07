@@ -79,13 +79,11 @@ public class AffineFeature extends Feature2D {
 
 
     //
-    // C++:  void cv::AffineFeature::setViewParams(vector_float tilts, vector_float rolls)
+    // C++:  String cv::AffineFeature::getDefaultName()
     //
 
-    public void setViewParams(MatOfFloat tilts, MatOfFloat rolls) {
-        Mat tilts_mat = tilts;
-        Mat rolls_mat = rolls;
-        setViewParams_0(nativeObj, tilts_mat.nativeObj, rolls_mat.nativeObj);
+    public String getDefaultName() {
+        return getDefaultName_0(nativeObj);
     }
 
 
@@ -101,11 +99,13 @@ public class AffineFeature extends Feature2D {
 
 
     //
-    // C++:  String cv::AffineFeature::getDefaultName()
+    // C++:  void cv::AffineFeature::setViewParams(vector_float tilts, vector_float rolls)
     //
 
-    public String getDefaultName() {
-        return getDefaultName_0(nativeObj);
+    public void setViewParams(MatOfFloat tilts, MatOfFloat rolls) {
+        Mat tilts_mat = tilts;
+        Mat rolls_mat = rolls;
+        setViewParams_0(nativeObj, tilts_mat.nativeObj, rolls_mat.nativeObj);
     }
 
 
@@ -123,14 +123,14 @@ public class AffineFeature extends Feature2D {
     private static native long create_3(long backend_nativeObj, int maxTilt);
     private static native long create_4(long backend_nativeObj);
 
-    // C++:  void cv::AffineFeature::setViewParams(vector_float tilts, vector_float rolls)
-    private static native void setViewParams_0(long nativeObj, long tilts_mat_nativeObj, long rolls_mat_nativeObj);
+    // C++:  String cv::AffineFeature::getDefaultName()
+    private static native String getDefaultName_0(long nativeObj);
 
     // C++:  void cv::AffineFeature::getViewParams(vector_float tilts, vector_float rolls)
     private static native void getViewParams_0(long nativeObj, long tilts_mat_nativeObj, long rolls_mat_nativeObj);
 
-    // C++:  String cv::AffineFeature::getDefaultName()
-    private static native String getDefaultName_0(long nativeObj);
+    // C++:  void cv::AffineFeature::setViewParams(vector_float tilts, vector_float rolls)
+    private static native void setViewParams_0(long nativeObj, long tilts_mat_nativeObj, long rolls_mat_nativeObj);
 
     // native support for java finalize()
     private static native void delete(long nativeObj);
