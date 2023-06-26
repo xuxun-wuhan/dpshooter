@@ -5,7 +5,6 @@ import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
@@ -28,98 +27,98 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.util.Size;
+import android.view.Surface;
+import android.view.SurfaceView;
 import android.widget.ImageView;
 
 /**
- * @brief Main activity class handling camera access and image processing.
+ * MainActivity class is the primary entry point of the application.
+ * This class sets up the application, initializes the camera and manages the image processing.
  */
 public class MainActivity extends AppCompatActivity {
+    static final int imageWidth = 640;
+    static final int imageHeight = 480;
+    private static final String TAG = "MainActivity";
+    private static final int PERMISSION_REQUEST_CAMERA = 0;
+
     /**
-     * @brief Used to load the 'native-lib' library on application startup.
+     * Load native libraries on startup.
      */
     static {
         System.loadLibrary("native-lib");
     }
 
-    /// @brief Width of the image.
-    static final int imageWidth = 640;
-
-    /// @brief Height of the image.
-    static final int imageHeight = 480;
-
-    /// @brief Tag for log messages.
-    private static final String TAG = "MainActivity";
-
-    /// @brief Request code for camera permission request.
-    private static final int PERMISSION_REQUEST_CAMERA = 0;
-
-    /// @brief View for displaying the camera preview.
-    private PreviewView previewView;
-
-    /// @brief View for displaying the processed image.
+    private OpenGLProcessor openGLProcessor;
+    private SurfaceView previewView;
     private ImageView opticalFlowView;
-
-    /// @brief Worker threads for background tasks.
     private HandlerThread[] workThreads;
-
-    /// @brief Handlers associated with worker threads.
     private Handler[] workHandlers;
-
-    /// @brief Future that provides access to the camera provider.
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
 
     /**
-     * @brief Native method for getting optical flow image.
-     * @param prevImg Buffer array of the previous image.
-     * @param nextImg Buffer array of the current image.
-     * @param imageWidth Width of the image.
-     * @param imageHeight Height of the image.
-     * @return Byte array representing the processed image.
+     * Method to retrieve optical flow image data.
+     *
+     * @param prevImg Previous image data.
+     * @param nextImg Next image data.
+     * @param imageWidth Width of the images.
+     * @param imageHeight Height of the images.
+     * @return Processed image data.
      */
-    public native byte[] getOpticalFlowImage(byte[] prevImg, byte[] nextImg, int imageWidth, int imageHeight);
+    private native byte[] getOpticalFlowImage(byte[] prevImg, byte[] nextImg, int imageWidth, int imageHeight);
 
     /**
-     * @brief Set up the activity.
-     * @param savedInstanceState Saved activity state.
+     * Called when the activity is starting.
+     *
+     * @param savedInstanceState If the activity is being re-initialized after previously being shut down then this Bundle contains the data it most recently supplied.
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Set up worker threads
         workThreads = new HandlerThread[3];
         workHandlers = new Handler[3];
-        for(int i=0; i<3; i++) {
-            workThreads[i] = new HandlerThread("work_thread_"+i);
+        for (int i = 0; i < 3; i++) {
+            workThreads[i] = new HandlerThread("work_thread_" + i);
             workThreads[i].start();
             workHandlers[i] = new Handler(workThreads[i].getLooper());
         }
 
-        // Get view references
+        openGLProcessor = new OpenGLProcessor(imageWidth, imageHeight);
+
         previewView = findViewById(R.id.viewFinder);
         opticalFlowView = findViewById(R.id.opticalFlowView);
 
-        // Request camera provider
         cameraProviderFuture = ProcessCameraProvider.getInstance(this);
 
         if (allPermissionsGranted()) {
-            startCamera(); //start camera if permission has been granted by user
+            startCamera();
         } else {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, PERMISSION_REQUEST_CAMERA);
         }
     }
 
     /**
-     * @brief Check if all required permissions are granted.
-     * @return True if all permissions are granted, false otherwise.
+     * Perform any final cleanup before an activity is destroyed.
+     */
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // TODO: add openGLProcessor cleanup code if necessary
+    }
+
+    /**
+     * Check if all the required permissions are granted.
+     *
+     * @return True if permissions are granted, false otherwise.
      */
     private boolean allPermissionsGranted() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
     }
 
     /**
-     * @brief Start the camera view.
+     * Starts the camera and binds the use cases.
      */
     private void startCamera() {
         cameraProviderFuture.addListener(() -> {
@@ -134,35 +133,34 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Bind the camera preview to the app.
-     * @param cameraProvider ProcessCameraProvider instance.
+     * Bind camera data to our Preview, along with analysis use cases.
+     *
+     * @param cameraProvider Camera provider used to bind the lifecycle, use cases and camera selector.
      */
     private void bindPreview(ProcessCameraProvider cameraProvider) {
         Preview preview = new Preview.Builder().build();
-        preview.setSurfaceProvider(previewView.getSurfaceProvider());
+        // Set up a Surface tied to the previewView in the OpenGLProcessor
+        Surface previewViewSurface = previewView.getHolder().getSurface();
+        int previewWidth = previewView.getHolder().getSurfaceFrame().width();
+        int previewHeight = previewView.getHolder().getSurfaceFrame().height();
+        openGLProcessor.setOutgoingSurface(previewViewSurface, previewWidth, previewHeight);
+
+        // Create a surface with the camera texture and provide it to the preview
+        Surface cameraTextureSurface = new Surface(openGLProcessor.getCameraTexture());
+        preview.setSurfaceProvider(request -> request.provideSurface(cameraTextureSurface, ContextCompat.getMainExecutor(this), result -> {
+        }));
 
         ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                 .setTargetResolution(new Size(imageWidth, imageHeight))
                 .build();
 
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this), new ImageAnalysis.Analyzer() {
-            /// @brief Previous image.
             private byte[] prevPic = null;
-
-            /// @brief Current image.
             private byte[] nextPic = null;
-
-            /// @brief Index of the worker thread to be used for the next task.
             private AtomicInteger workerIndex = new AtomicInteger(0);  // Thread-safe counter
 
-            /**
-             * @brief Analyze an image to process it and update the UI.
-             * @param image The image to be analyzed.
-             */
             @Override
             public void analyze(ImageProxy image) {
-                // TODO: Validate image resolution support and compactness of Y channel (image pitch = image width).
-                // Initialize prevMat on first frame
                 if (prevPic == null) {
                     ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
                     ByteBuffer yBuffer = yPlane.getBuffer();
@@ -178,10 +176,8 @@ public class MainActivity extends AppCompatActivity {
                 nextPic = new byte[yBuffer.remaining()];
                 yBuffer.get(nextPic);
 
-                // Copy the current image pairs to avoid thread safety issues
                 byte[] localPrevPic = prevPic.clone();
 
-                // Schedule the task on a worker thread, rotating between them
                 int workerId = workerIndex.getAndUpdate(i -> (i + 1) % workHandlers.length);
                 workHandlers[workerId].post(() -> processImagePairs(localPrevPic, nextPic, imageWidth, imageHeight));
 
@@ -195,10 +191,8 @@ public class MainActivity extends AppCompatActivity {
                 .build();
 
         try {
-            // Unbind use cases before rebinding
             cameraProvider.unbindAll();
 
-            // Bind use cases to camera
             Camera camera = cameraProvider.bindToLifecycle(
                     (LifecycleOwner) this, cameraSelector, preview, imageAnalysis);
 
@@ -208,24 +202,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Process a pair of images and update the UI.
-     * @param prevImg Buffer array of the previous image.
-     * @param nextImg Buffer array of the current image.
+     * Process an image pair to generate and display an optical flow image.
+     *
+     * @param prevImg Previous image data.
+     * @param nextImg Next image data.
      * @param w Width of the images.
      * @param h Height of the images.
      */
-    void processImagePairs(byte[] prevImg, byte[] nextImg, int w, int h ) {
+    void processImagePairs(byte[] prevImg, byte[] nextImg, int w, int h) {
         byte[] byteArray = getOpticalFlowImage(prevImg, nextImg, w, h);
         Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         ByteBuffer buffer = ByteBuffer.wrap(byteArray);
         bitmap.copyPixelsFromBuffer(buffer);
 
-        // Display bitmap on screen using ImageView
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                opticalFlowView.setImageBitmap(bitmap);
-            }
-        });
+        runOnUiThread(() -> opticalFlowView.setImageBitmap(bitmap));
     }
 }
