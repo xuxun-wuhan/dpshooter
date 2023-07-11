@@ -58,13 +58,14 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Method to retrieve optical flow image data.
      *
-     * @param prevImg Previous image data.
-     * @param nextImg Next image data.
-     * @param imageWidth Width of the images.
-     * @param imageHeight Height of the images.
+     * @param prevImg             Previous image data.
+     * @param nextImg             Next image data.
+     * @param opticalFlowVertices The OpenGL vertices used for optical flow based forward warping.
+     * @param imageWidth          Width of the images.
+     * @param imageHeight         Height of the images.
      * @return Processed image data.
      */
-    private native byte[] getOpticalFlowImage(byte[] prevImg, byte[] nextImg, int imageWidth, int imageHeight);
+    private native byte[] getOpticalFlowImage(byte[] prevImg, byte[] nextImg, float[] opticalFlowVertices, int imageWidth, int imageHeight);
 
     /**
      * Called when the activity is starting.
@@ -157,6 +158,8 @@ public class MainActivity extends AppCompatActivity {
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this), new ImageAnalysis.Analyzer() {
             private byte[] prevPic = null;
             private byte[] nextPic = null;
+            private long prevPicTimestamp = 0;
+            private long nextPicTimestamp = 0;
             private AtomicInteger workerIndex = new AtomicInteger(0);  // Thread-safe counter
 
             @Override
@@ -167,6 +170,7 @@ public class MainActivity extends AppCompatActivity {
                     yBuffer.rewind();
                     prevPic = new byte[yBuffer.remaining()];
                     yBuffer.get(prevPic);
+                    prevPicTimestamp = image.getImageInfo().getTimestamp();
                     image.close();
                     return;
                 }
@@ -175,13 +179,16 @@ public class MainActivity extends AppCompatActivity {
                 yBuffer.rewind();
                 nextPic = new byte[yBuffer.remaining()];
                 yBuffer.get(nextPic);
+                nextPicTimestamp = image.getImageInfo().getTimestamp();
 
                 byte[] localPrevPic = prevPic.clone();
+                long localPrevPicTimestamp = prevPicTimestamp;
 
                 int workerId = workerIndex.getAndUpdate(i -> (i + 1) % workHandlers.length);
-                workHandlers[workerId].post(() -> processImagePairs(localPrevPic, nextPic, imageWidth, imageHeight));
+                workHandlers[workerId].post(() -> processImagePairs(localPrevPic, nextPic, localPrevPicTimestamp, imageWidth, imageHeight));
 
                 prevPic = nextPic;
+                prevPicTimestamp = nextPicTimestamp;
                 image.close();
             }
         });
@@ -206,11 +213,16 @@ public class MainActivity extends AppCompatActivity {
      *
      * @param prevImg Previous image data.
      * @param nextImg Next image data.
-     * @param w Width of the images.
-     * @param h Height of the images.
+     * @param w       Width of the images.
+     * @param h       Height of the images.
      */
-    void processImagePairs(byte[] prevImg, byte[] nextImg, int w, int h) {
-        byte[] byteArray = getOpticalFlowImage(prevImg, nextImg, w, h);
+    void processImagePairs(byte[] prevImg, byte[] nextImg, long prevImgTimestamp, int w, int h) {
+        int glWidth = w / 2;
+        int glHeight = h / 2;
+        float[] opticalFlowVertices = new float[glWidth * glHeight * 2];
+        byte[] byteArray = getOpticalFlowImage(prevImg, nextImg, opticalFlowVertices, w, h);
+        //Submit optical flow estimation and frm0's timestamp for forward warping
+        openGLProcessor.addOpticalFlowVertices(prevImgTimestamp, opticalFlowVertices);
         Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         ByteBuffer buffer = ByteBuffer.wrap(byteArray);
         bitmap.copyPixelsFromBuffer(buffer);

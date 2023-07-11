@@ -1,5 +1,6 @@
 package com.example.dualphoneshooter;
 
+import android.graphics.Path;
 import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
@@ -15,6 +16,8 @@ import android.view.Surface;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.util.concurrent.PriorityBlockingQueue;
 
 /**
  * @class OpenGLProcessor
@@ -23,8 +26,7 @@ import java.nio.FloatBuffer;
 public class OpenGLProcessor {
     // Static configuration variables
     private static final String TAG = "OpenGLProcessor";
-    private static final int FBO_COUNT = 4;
-
+    private static final int FBO_COUNT = 8;
     private final int width;
     private final int height;
     // Vertex shader
@@ -45,7 +47,6 @@ public class OpenGLProcessor {
                     "void main() {" +
                     "  gl_FragColor = texture2D( s_texture, textureCoordinate );\n" +
                     "}";
-
     // Fragment shader for second rendering pass
     private final String fragmentShaderCode2 =
             "precision mediump float;" +
@@ -55,6 +56,8 @@ public class OpenGLProcessor {
                     "  gl_FragColor = texture2D( s_texture, textureCoordinate );\n" +
                     "}";
     private final Framebuffer[] fboRingBuffer = new Framebuffer[FBO_COUNT];
+    // A queue that's sort by timestamp.
+    PriorityBlockingQueue<OpticalFlowVertices> OpticalFlowVertexBuffer = new PriorityBlockingQueue<>();
     private EGLContext eglContext;
     // Rectangle vertices
     private float squareCoords[] = {
@@ -72,15 +75,13 @@ public class OpenGLProcessor {
             0.0f, 1.0f,  // bottom left
             1.0f, 0.0f,  // top right
             1.0f, 1.0f}; // bottom right
-    private float textureCoordsForFBO[] = {
-            0.0f, 1.0f,  // top left
-            0.0f, 0.0f,  // bottom left
-            1.0f, 1.0f,  // top right
-            1.0f, 0.0f}; // bottom right
-    // Vertex buffers
+    // Vertex buffers, Texture buffers, and Index buffers
     private FloatBuffer vertexBuffer;
     private FloatBuffer textureBuffer;
+    private FloatBuffer vertexBufferForFBO;
     private FloatBuffer textureBufferForFBO;
+    private IntBuffer indexBufferForFBO;
+    private int indexBufferId;
     private int currentFBOIndex = 0;
     private int textureId;
     private SurfaceTexture cameraTexture;
@@ -94,16 +95,17 @@ public class OpenGLProcessor {
     private int positionHandle;
     private int textureHandle;
     private int textureCoordHandle;
-
     private int fragmentShader2;
     private int shaderProgram2;
+    private int positionHandle2;
     private int textureHandle2;
+    private int textureCoordHandle2;
     private boolean isInitialized;
 
     /**
-     * @brief Constructor for OpenGLProcessor.
-     * @param width Width of the OpenGL context.
+     * @param width  Width of the OpenGL context.
      * @param height Height of the OpenGL context.
+     * @brief Constructor for OpenGLProcessor.
      */
     public OpenGLProcessor(int width, int height) {
         // Initialize dimensions
@@ -111,6 +113,10 @@ public class OpenGLProcessor {
         this.height = height;
         isInitialized = false;
     }
+
+    private native void getTextureCoords(FloatBuffer buffer, int w, int h);
+
+    private native void getTriangleIndexBuffer(IntBuffer buffer, int w, int h);
 
     /**
      * @brief Init code. Called only after outgoingSurface is available.
@@ -195,11 +201,27 @@ public class OpenGLProcessor {
         textureBuffer.put(textureCoords);
         textureBuffer.position(0);
 
-        ByteBuffer tb2 = ByteBuffer.allocateDirect(textureCoordsForFBO.length * 4);
+        int glWidth = width / 2;
+        int glHeight = height / 2;
+
+
+        ByteBuffer tb2 = ByteBuffer.allocateDirect(glWidth * glHeight * 2 * 4);
         tb2.order(ByteOrder.nativeOrder());
         textureBufferForFBO = tb2.asFloatBuffer();
-        textureBufferForFBO.put(textureCoordsForFBO);
+        getTextureCoords(textureBufferForFBO, glWidth, glHeight);
         textureBufferForFBO.position(0);
+
+        ByteBuffer tb3 = ByteBuffer.allocateDirect(glWidth * glHeight * 2 * 4);
+        tb3.order(ByteOrder.nativeOrder());
+        vertexBufferForFBO = tb3.asFloatBuffer();
+        vertexBufferForFBO.position(0);
+
+        //Get index buffers
+        ByteBuffer ib = ByteBuffer.allocateDirect(glWidth * glHeight * 6 * 4);  // 6 indices per quad, each index is 4 bytes
+        ib.order(ByteOrder.nativeOrder());
+        indexBufferForFBO = ib.asIntBuffer();
+        getTriangleIndexBuffer(indexBufferForFBO, glWidth, glHeight);
+        indexBufferForFBO.position(0);
 
         // Set up shaders and program
         vertexShader = GLES20.glCreateShader(GLES20.GL_VERTEX_SHADER);
@@ -231,8 +253,23 @@ public class OpenGLProcessor {
         GLES20.glLinkProgram(shaderProgram2);
 
         // Get handle for passing in data to the second shader
+        positionHandle2 = GLES20.glGetAttribLocation(shaderProgram2, "vPosition");
         textureHandle2 = GLES20.glGetUniformLocation(shaderProgram2, "s_texture");
+        textureCoordHandle2 = GLES20.glGetAttribLocation(shaderProgram2, "inputTextureCoordinate");
 
+        // Generate index buffer for OpenGL
+        int[] buffers = new int[1];
+        GLES20.glGenBuffers(1, buffers, 0);
+        indexBufferId = buffers[0];
+
+        // Bind to the buffer. Future commands will affect this buffer specifically.
+        GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, indexBufferId);
+
+        // Transfer data from client memory to the GPU buffer.
+        GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, glWidth * glHeight * 6 * 4, indexBufferForFBO, GLES20.GL_STATIC_DRAW);
+
+        // Unbind from the buffer when we're done with it.
+        GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
         isInitialized = true;
     }
 
@@ -277,8 +314,8 @@ public class OpenGLProcessor {
      * Sets the outgoing surface along with its dimensions. If OpenGLProcessor is not yet initialized,
      * this method also triggers the initialization.
      *
-     * @param outgoingSurface The surface where the output is to be drawn.
-     * @param outgoingSurfaceWidth The width of the outgoing surface.
+     * @param outgoingSurface       The surface where the output is to be drawn.
+     * @param outgoingSurfaceWidth  The width of the outgoing surface.
      * @param outgoingSurfaceHeight The height of the outgoing surface.
      */
     public void setOutgoingSurface(Surface outgoingSurface, int outgoingSurfaceWidth, int outgoingSurfaceHeight) {
@@ -302,6 +339,7 @@ public class OpenGLProcessor {
     private void render(SurfaceTexture ignored) {
         // Update the camera preview texture
         cameraTexture.updateTexImage();
+        fboRingBuffer[currentFBOIndex].timestamp = cameraTexture.getTimestamp();
 
         // Get transformation matrix from the SurfaceTexture
         float[] mtx = new float[16];
@@ -322,8 +360,42 @@ public class OpenGLProcessor {
         GLES20.glDisableVertexAttribArray(positionHandle);
         GLES20.glDisableVertexAttribArray(textureCoordHandle);
 
+
+        //Get ...
+        long timestamp;
+        float[] opticalFlowVerices;
+        if (OpticalFlowVertexBuffer.size() == 0) {
+            return;
+        }
+        try {
+            OpticalFlowVertices oldestRec = OpticalFlowVertexBuffer.take();
+            timestamp = oldestRec.timeStamp;
+            opticalFlowVerices = oldestRec.vertices;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return;
+        }
+
         // Prepare to render the next FBO to the screen
-        int nextFBOIndex = (currentFBOIndex + 1) % FBO_COUNT;
+        long minTimeStampDiff = Math.abs(timestamp);
+        int fboIdx = 0;
+        for (int i = 0; i < FBO_COUNT; i++) {
+            long temp = Math.abs(timestamp - fboRingBuffer[i].timestamp);
+            if (temp < minTimeStampDiff) {
+                minTimeStampDiff = temp;
+                fboIdx = i;
+            }
+        }
+
+
+        int nextFBOIndex = fboIdx;
+        vertexBufferForFBO.rewind();
+        vertexBufferForFBO.put(opticalFlowVerices);
+        vertexBufferForFBO.rewind();
+        textureBufferForFBO.rewind();
+        indexBufferForFBO.rewind();
+        int glWidth = width / 2;
+        int glHeight = height / 2;
         GLES20.glUseProgram(shaderProgram2);
         GLES20.glViewport(0, 0, outgoingSurfaceWidth, outgoingSurfaceHeight);
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
@@ -332,14 +404,16 @@ public class OpenGLProcessor {
         GLES20.glUniform1i(textureHandle2, 0);
 
         // Draw the texture from the next FBO to the screen
-        GLES20.glEnableVertexAttribArray(positionHandle);
-        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 8, vertexBuffer);
-        GLES20.glEnableVertexAttribArray(textureCoordHandle);
-        GLES20.glVertexAttribPointer(textureCoordHandle, 2, GLES20.GL_FLOAT, false, 8, textureBufferForFBO); // use textureBufferForFBO here
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
-        GLES20.glDisableVertexAttribArray(positionHandle);
-        GLES20.glDisableVertexAttribArray(textureCoordHandle);
-
+        GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, indexBufferId);
+        GLES20.glEnableVertexAttribArray(positionHandle2);
+        GLES20.glVertexAttribPointer(positionHandle2, 2, GLES20.GL_FLOAT, false, 8, vertexBufferForFBO);
+        GLES20.glEnableVertexAttribArray(textureCoordHandle2);
+        GLES20.glVertexAttribPointer(textureCoordHandle2, 2, GLES20.GL_FLOAT, false, 8, textureBufferForFBO); // use textureBufferForFBO here
+        // Note: The last argument to glDrawElements is the number of indices, not vertices.
+        GLES20.glDrawElements(GLES20.GL_TRIANGLES, glWidth * glHeight * 6, GLES20.GL_UNSIGNED_INT, 0);
+        GLES20.glDisableVertexAttribArray(positionHandle2);
+        GLES20.glDisableVertexAttribArray(textureCoordHandle2);
+        GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
         // Update the current FBO index
         currentFBOIndex = (currentFBOIndex + 1) % FBO_COUNT;
 
@@ -349,12 +423,38 @@ public class OpenGLProcessor {
         }
     }
 
+    public void addOpticalFlowVertices(long timestamp, float[] vertices) {
+        OpticalFlowVertices rec = new OpticalFlowVertices(timestamp, vertices);
+        OpticalFlowVertexBuffer.add(rec);
+        if (OpticalFlowVertexBuffer.size() > 8) {
+            OpticalFlowVertexBuffer.poll();
+        }
+    }
+
+    private class OpticalFlowVertices implements Comparable<OpticalFlowVertices> {
+        public long timeStamp;
+        public float[] vertices;
+
+        public OpticalFlowVertices(long inTimestamp, float[] inVertices) {
+            timeStamp = inTimestamp;
+            vertices = inVertices;
+        }
+
+        @Override
+        public int compareTo(OpticalFlowVertices other) {
+            return Long.compare(this.timeStamp, other.timeStamp);
+        }
+    }
+
     /**
      * Represents a framebuffer object (FBO) that contains a framebuffer and a texture.
      * The framebuffer is used for rendering purposes, and the texture holds the rendered data.
      */
     private class Framebuffer {
-        int framebuffer;  /**< The ID of the framebuffer object. */
+        int framebuffer;
+        /**
+         * < The ID of the framebuffer object.
+         */
         int texture;  /**< The ID of the texture object. */
 
         /**
@@ -363,9 +463,13 @@ public class OpenGLProcessor {
          * @param framebuffer The ID of the framebuffer object.
          * @param texture     The ID of the texture object.
          */
+        long timestamp;
+
         Framebuffer(int framebuffer, int texture) {
             this.framebuffer = framebuffer;
             this.texture = texture;
+            this.timestamp = 0;
         }
     }
+
 }
