@@ -6,6 +6,7 @@
 #include <opencv2/video/tracking.hpp>
 
 #include <vector>
+#include <cmath>
 
 using namespace cv;
 
@@ -21,6 +22,60 @@ inline Point2f getFlowAt(int x, int y, Mat &flow) {
     float fx = flow.at<Vec2f>(y, x)[0];
     float fy = flow.at<Vec2f>(y, x)[1];
     return Point2f(fx, fy);
+}
+
+/**
+ * @brief Solve warping collision in the estimated optical flow field.
+ *
+ * In the context of optical flow based image warping, warping collisions occur
+ * when multiple source pixels are mapped to the same target pixel in the warped image.
+ * This function aims to mitigate the issue by applying a weighted Gaussian filtering
+ * to the optical flow field. This operation effectively spreads out the influence of
+ * strong flow vectors over a larger neighborhood, thereby reducing the likelihood of collisions.
+ *
+ * @param image1 The first image.
+ * @param image2 The second image.
+ * @param flow The estimated optical flow field.
+ */
+ void solveWarpingCollision(Mat &image1, Mat &image2, Mat &flow) {
+    int width = image1.cols;
+    int height = image1.rows;
+    const int topBdWidth = 60;
+    const int sideBdWidth = 100;
+    const float wParam = 8.0f;
+    const int kSize = 5;
+    const float sigmaX = 0.5f;
+    Mat paddedImage2;
+    Mat weights(flow.size(), CV_32FC2);
+
+    //Compute weight of occlusion. The occluding pixel has higher weight. The
+    copyMakeBorder(image2, paddedImage2, topBdWidth, topBdWidth, sideBdWidth, sideBdWidth,
+                   cv::BORDER_REPLICATE);
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            float val0 = float(image1.at<uchar>(i, j));
+            int fx = int(std::trunc(flow.at<Vec2f>(i, j)[0]));
+            int fy = int(std::trunc(flow.at<Vec2f>(i, j)[1]));
+            float val1 = float(paddedImage2.at<uchar>(i + topBdWidth + fy, j + sideBdWidth + fx));
+            //The difference between val0 and val1 means this is a occluding pixel. Rather than an occluded one.
+            float wt = wParam / (abs(val0 - val1) + wParam);
+            weights.at<Vec2f>(i, j)[0] = wt;
+            weights.at<Vec2f>(i, j)[1] = wt;
+        }
+    }
+    //Do weighted Gaussian filtering.
+    // Apply weights to the image
+    Mat weighted_flow;
+    multiply(flow, weights, weighted_flow, 1, CV_32FC2);
+
+    // Apply Gaussian blur to the weighted flow
+    Mat blurred_flow;
+    GaussianBlur(weighted_flow, blurred_flow, cv::Size(kSize, kSize), sigmaX);
+
+    // Normalize by the weights
+    Mat blurred_weights;
+    GaussianBlur(weights, blurred_weights, cv::Size(kSize, kSize), sigmaX);
+    flow = blurred_flow / blurred_weights;
 }
 
 /**
@@ -66,8 +121,10 @@ Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
             cv::optflow::createOptFlow_SparseToDense();
     opticalFlowCalculator->calc(img1_small, img2_small, flow_small);
 
+    solveWarpingCollision(img1_small, img2_small, flow_small);
     // Get float array data
     jfloat *opticalFlowVerticesData = env->GetFloatArrayElements(opticalFlowVertices, NULL);
+
 
 // Set OpenGL vertices which covers the a 2.0 x 2.0 area.
     int smallW = w / 2;
