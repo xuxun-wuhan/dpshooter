@@ -18,7 +18,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 /**
  * @class OpenGLProcessor
  * @brief This class handles OpenGL related operations for DualPhoneShooter.
- *
+ * <p>
  * The class is responsible for handling the OpenGL rendering process, and it includes setting up
  * the OpenGL context, rendering frames from the camera to a Framebuffer Object (FBO), and rendering
  * frames from the FBO to the screen.
@@ -59,6 +59,9 @@ public class OpenGLProcessor {
     private FloatBuffer vertexBufferForFBO;
     private FloatBuffer textureBufferForFBO;
     private IntBuffer indexBufferForFBO;
+    private FloatBuffer vertexBufferForHoleFilling;
+    private FloatBuffer textureBufferForHoleFilling;
+
     private int indexBufferId;
     private int currentFBOIndex = 0;
     private int textureId;
@@ -76,13 +79,14 @@ public class OpenGLProcessor {
     private int shaderProgram2;
     private int positionHandle2;
     private int textureCoordHandle2;
+
     private boolean isInitialized;
 
     /**
      * @param width  Width of the OpenGL context.
      * @param height Height of the OpenGL context.
      * @brief Constructor for OpenGLProcessor.
-     *
+     * <p>
      * The constructor initializes the width and height of the OpenGL context.
      */
     public OpenGLProcessor(int width, int height) {
@@ -94,21 +98,21 @@ public class OpenGLProcessor {
 
     /**
      * @brief Native method for getting texture coordinates.
-     *
+     * <p>
      * This method is implemented in the native library and it fills the buffer with texture coordinates.
      */
     private native void getTextureCoords(FloatBuffer buffer, int w, int h);
 
     /**
      * @brief Native method for getting triangle index buffer.
-     *
+     * <p>
      * This method is implemented in the native library and it fills the buffer with the indices of the vertices of the triangles.
      */
     private native void getTriangleIndexBuffer(IntBuffer buffer, int w, int h);
 
     /**
      * @brief Init code. Called only after outgoingSurface is available.
-     *
+     * <p>
      * This method initializes the OpenGL environment, which includes creating a SurfaceTexture, setting up the EGL display, creating framebuffers, setting up vertex data, setting up shaders and programs, and generating index buffer for OpenGL.
      */
     private void initialize() {
@@ -158,6 +162,16 @@ public class OpenGLProcessor {
         getTriangleIndexBuffer(indexBufferForFBO, glWidth, glHeight);
         indexBufferForFBO.position(0);
 
+        ByteBuffer tb4 = ByteBuffer.allocateDirect(glWidth * glHeight * 2 * 4);
+        tb4.order(ByteOrder.nativeOrder());
+        textureBufferForHoleFilling = tb4.asFloatBuffer();
+        textureBufferForHoleFilling.position(0);
+
+        ByteBuffer tb5 = ByteBuffer.allocateDirect(glWidth * glHeight * 2 * 4);
+        tb5.order(ByteOrder.nativeOrder());
+        vertexBufferForHoleFilling = tb5.asFloatBuffer();
+        vertexBufferForHoleFilling.position(0);
+
         // Set up shaders and program
         vertexShader = OpenGLUtils.createShader(OpenGLUtils.vertexShaderCode, GLES20.GL_VERTEX_SHADER);
         fragmentShader = OpenGLUtils.createShader(OpenGLUtils.fragmentShaderCode, GLES20.GL_FRAGMENT_SHADER);
@@ -188,9 +202,8 @@ public class OpenGLProcessor {
     }
 
     /**
-     * @brief Called by host to fetch the SurfaceTexture for receiving camera frames.
-     *
      * @return Returns the SurfaceTexture which is used for receiving camera frames.
+     * @brief Called by host to fetch the SurfaceTexture for receiving camera frames.
      */
     public SurfaceTexture getCameraTexture() {
         return cameraTexture;
@@ -226,24 +239,28 @@ public class OpenGLProcessor {
         renderCameraToFBO();
 
         long timestamp;
-        float[] opticalFlowVerices;
+        float[] opticalFlowVertices;
+        float[] holeFilingTextureCoordinates;
+        float[] holeFillngVertices;
         if (OpticalFlowVertexBuffer.size() == 0) {
             return;
         }
         try {
             OpticalFlowVertices oldestRec = OpticalFlowVertexBuffer.take();
             timestamp = oldestRec.timeStamp;
-            opticalFlowVerices = oldestRec.vertices;
+            opticalFlowVertices = oldestRec.vertices;
+            holeFilingTextureCoordinates = oldestRec.holeFillingTextureCoords;
+            holeFillngVertices = oldestRec.holeFillingVertices;
         } catch (InterruptedException e) {
             e.printStackTrace();
             return;
         }
-        renderFBOToScreen(timestamp, opticalFlowVerices);
+        renderFBOToScreen(timestamp, opticalFlowVertices, holeFilingTextureCoordinates, holeFillngVertices);
     }
 
     /**
      * @brief This method renders the camera frames to the frame buffer object (FBO).
-     *
+     * <p>
      * This method updates the camera texture and sets its timestamp. Then it binds to the shader program and sets the viewport.
      * After that, it binds to the framebuffer and the texture, and sets the vertex and texture coordinates. Finally, it draws the texture onto the FBO and then disables the vertex attributes.
      */
@@ -273,15 +290,15 @@ public class OpenGLProcessor {
     }
 
     /**
+     * @param timestamp          The timestamp of the frame that's being rendered.
+     * @param opticalFlowVerices The vertices of the optical flow.
      * @brief This method renders the frames from the frame buffer object (FBO) to the screen.
-     *
+     * <p>
      * This method prepares the vertex, texture, and index buffers and sets the viewport. Then it finds the FBO with the closest timestamp and prepares to render it to the screen.
      * After that, it binds to the framebuffer and the texture, and sets the vertex and texture coordinates. Finally, it draws the texture from the FBO onto the screen and then disables the vertex attributes.
-     *
-     * @param timestamp The timestamp of the frame that's being rendered.
-     * @param opticalFlowVerices The vertices of the optical flow.
      */
-    private void renderFBOToScreen(long timestamp, float[] opticalFlowVerices) {
+    private void renderFBOToScreen(long timestamp, float[] opticalFlowVerices,
+                                   float[] holeFillingTextureCoords, float[] holeFillingVertices) {
         vertexBufferForFBO.rewind();
         vertexBufferForFBO.put(opticalFlowVerices);
         vertexBufferForFBO.rewind();
@@ -321,6 +338,31 @@ public class OpenGLProcessor {
         GLES20.glDisableVertexAttribArray(textureCoordHandle2);
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
 
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+
+        //Hole filling by backward rendering
+        if (holeFillingTextureCoords.length > 11) {
+            // At least 1 triangles existing for hole filling, render it as backward warping
+            textureBufferForHoleFilling.rewind();
+            textureBufferForHoleFilling.put(holeFillingTextureCoords);
+            textureBufferForHoleFilling.rewind();
+            vertexBufferForHoleFilling.rewind();
+            vertexBufferForHoleFilling.put(holeFillingVertices);
+            vertexBufferForHoleFilling.rewind();
+
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fboRingBuffer[(nextFBOIndex + 1) % FBO_COUNT].texture);
+            GLES20.glEnableVertexAttribArray(positionHandle2);
+            GLES20.glVertexAttribPointer(positionHandle2, 2, GLES20.GL_FLOAT, false, 8, vertexBufferForHoleFilling);
+            GLES20.glEnableVertexAttribArray(textureCoordHandle2);
+            GLES20.glVertexAttribPointer(textureCoordHandle2, 2, GLES20.GL_FLOAT, false, 8, textureBufferForHoleFilling);
+
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, holeFillingVertices.length / 2);
+
+            GLES20.glDisableVertexAttribArray(positionHandle2);
+            GLES20.glDisableVertexAttribArray(textureCoordHandle2);
+
+        }
         // Update the current FBO index
         currentFBOIndex = (currentFBOIndex + 1) % FBO_COUNT;
 
@@ -331,15 +373,15 @@ public class OpenGLProcessor {
     }
 
     /**
-     * @brief This method adds a new set of optical flow vertices to the queue.
-     *
-     * This method creates a new OpticalFlowVertices object and adds it to the queue. If the size of the queue is greater than 8, it removes the oldest item from the queue.
-     *
      * @param timestamp The timestamp of the frame.
-     * @param vertices The vertices of the optical flow.
+     * @param vertices  The vertices of the optical flow.
+     * @brief This method adds a new set of optical flow vertices to the queue.
+     * <p>
+     * This method creates a new OpticalFlowVertices object and adds it to the queue. If the size of the queue is greater than 8, it removes the oldest item from the queue.
      */
-    public void addOpticalFlowVertices(long timestamp, float[] vertices) {
-        OpticalFlowVertices rec = new OpticalFlowVertices(timestamp, vertices);
+    public void addOpticalFlowVertices(long timestamp, float[] vertices,
+                                       float[] inHFTextureCoords, float[] inHFVertices) {
+        OpticalFlowVertices rec = new OpticalFlowVertices(timestamp, vertices, inHFTextureCoords, inHFVertices);
         OpticalFlowVertexBuffer.add(rec);
         if (OpticalFlowVertexBuffer.size() > 8) {
             OpticalFlowVertexBuffer.poll();
@@ -349,16 +391,21 @@ public class OpenGLProcessor {
     /**
      * @class OpticalFlowVertices
      * @brief This class is used for storing the vertices of the optical flow and their corresponding timestamp.
-     *
+     * <p>
      * The class implements Comparable, so that the instances of this class can be sorted based on their timestamp.
      */
     private class OpticalFlowVertices implements Comparable<OpticalFlowVertices> {
         public long timeStamp;
         public float[] vertices;
+        public float[] holeFillingTextureCoords;
+        public float[] holeFillingVertices;
 
-        public OpticalFlowVertices(long inTimestamp, float[] inVertices) {
+        public OpticalFlowVertices(long inTimestamp, float[] inVertices,
+                                   float[] inHFTextureCoords, float[] inHFVertices) {
             timeStamp = inTimestamp;
             vertices = inVertices;
+            holeFillingTextureCoords = inHFTextureCoords;
+            holeFillingVertices = inHFVertices;
         }
 
         @Override

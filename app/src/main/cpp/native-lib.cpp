@@ -10,6 +10,17 @@
 
 using namespace cv;
 
+// Prepare three instances of the Dense Optical Flow estimator
+// for three separate worker threads.
+Ptr <DenseOpticalFlow> opticalFlowCalculator[3] =
+        {cv::optflow::createOptFlow_SparseToDense(),
+         cv::optflow::createOptFlow_SparseToDense(),
+         cv::optflow::createOptFlow_SparseToDense()};
+
+std::vector<float> holeFillingTextureCoords[3];
+std::vector<float> holeFillingVertices[3];
+
+
 /**
  * @brief This function fetches the flow vector at a specific point.
  *
@@ -25,58 +36,248 @@ inline Point2f getFlowAt(int x, int y, Mat &flow) {
 }
 
 /**
- * @brief Solve warping collision in the estimated optical flow field.
+ * @brief Creates triangles by backward warping based on the optical flow.
  *
- * In the context of optical flow based image warping, warping collisions occur
- * when multiple source pixels are mapped to the same target pixel in the warped image.
- * This function aims to mitigate the issue by applying a weighted Gaussian filtering
- * to the optical flow field. This operation effectively spreads out the influence of
- * strong flow vectors over a larger neighborhood, thereby reducing the likelihood of collisions.
- *
- * @param image1 The first image.
- * @param image2 The second image.
- * @param flow The estimated optical flow field.
+ * @param width Width of the image.
+ * @param height Height of the image.
+ * @param pointBG Background point.
+ * @param pointFG Foreground point.
+ * @param flowBG Background flow.
+ * @param holeFillingTextureCoords Texture coordinates for hole filling.
+ * @param holeFillingVertices Vertices for hole filling.
  */
- void solveWarpingCollision(Mat &image1, Mat &image2, Mat &flow) {
+ inline void createTriangles(int width, int height, Vec2f &pointBG, Vec2f &pointFG, Vec2f &flowBG,
+                            std::vector<float> &holeFillingTextureCoords,
+                            std::vector<float> &holeFillingVertices) {
+    //Compile texture and vertex points.
+    //Note: as far, all the points are in image coordinates
+    Vec2f pointDiff = pointBG - pointFG;
+    //Swap the x, y of pointDiff and reverse the sign of x, or y
+    // to make the pointDiff orthogonal to (pointBG - pointFG)
+    float temp = pointDiff[1];
+    pointDiff[1] = pointDiff[0];
+    pointDiff[0] = -temp;
+    pointDiff = pointDiff / (norm(pointDiff) + .01f);
+    Vec2f pointTx[4];
+    pointTx[0] = pointBG + pointDiff;
+    pointTx[1] = pointBG - pointDiff;
+    pointTx[2] = pointFG + pointDiff;
+    pointTx[3] = pointFG - pointDiff;
+    Vec2f pointVx[4];
+    for (int idx = 0; idx < 4; idx++) {
+        pointVx[idx] = pointTx[idx] + flowBG;
+    }
+    for (int idx = 0; idx < 4; idx++) {
+        //Change points from image coordinates to texture coordinates and vertex coordinates
+        pointTx[idx][0] /= float(width);
+        pointTx[idx][1] = (float(height - 1) - pointTx[idx][1]) / float(height);
+
+        pointVx[idx][0] = pointVx[idx][0] / float(width) * 2.0f - 1.0f;
+        pointVx[idx][1] =
+                (float(height - 1) - pointVx[idx][1]) / float(height) * 2.0f - 1.0f;
+    }
+    //Triangle 0
+    holeFillingTextureCoords.push_back(pointTx[0][0]);
+    holeFillingTextureCoords.push_back(pointTx[0][1]);
+    holeFillingTextureCoords.push_back(pointTx[1][0]);
+    holeFillingTextureCoords.push_back(pointTx[1][1]);
+    holeFillingTextureCoords.push_back(pointTx[3][0]);
+    holeFillingTextureCoords.push_back(pointTx[3][1]);
+
+    holeFillingVertices.push_back(pointVx[0][0]);
+    holeFillingVertices.push_back(pointVx[0][1]);
+    holeFillingVertices.push_back(pointVx[1][0]);
+    holeFillingVertices.push_back(pointVx[1][1]);
+    holeFillingVertices.push_back(pointVx[3][0]);
+    holeFillingVertices.push_back(pointVx[3][1]);
+
+    //Triangle 1
+    holeFillingTextureCoords.push_back(pointTx[0][0]);
+    holeFillingTextureCoords.push_back(pointTx[0][1]);
+    holeFillingTextureCoords.push_back(pointTx[2][0]);
+    holeFillingTextureCoords.push_back(pointTx[2][1]);
+    holeFillingTextureCoords.push_back(pointTx[3][0]);
+    holeFillingTextureCoords.push_back(pointTx[3][1]);
+
+    holeFillingVertices.push_back(pointVx[0][0]);
+    holeFillingVertices.push_back(pointVx[0][1]);
+    holeFillingVertices.push_back(pointVx[2][0]);
+    holeFillingVertices.push_back(pointVx[2][1]);
+    holeFillingVertices.push_back(pointVx[3][0]);
+    holeFillingVertices.push_back(pointVx[3][1]);
+}
+
+/**
+ * @brief Solve warping occlusion based on optical flow and fill holes in the warped images.
+ *
+ * @param image1 First image frame.
+ * @param image2 Second image frame.
+ * @param flow Optical flow.
+ * @param holeFillingTextureCoords Texture coordinates for hole filling.
+ * @param holeFillingVertices Vertices for hole filling.
+ * @param intervalPitch Temporal position between image1 and image2. 0: image1, 1: image2, 0.5: middle frame between image1 and image2.
+ */
+ void solveWarpingOcclusion(Mat &image1, Mat &image2, Mat &flow,
+                           std::vector<float> &holeFillingTextureCoords,
+                           std::vector<float> &holeFillingVertices, float intervalPitch) {
+    holeFillingTextureCoords.clear();
+    holeFillingVertices.clear();
     int width = image1.cols;
     int height = image1.rows;
     const int topBdWidth = 60;
     const int sideBdWidth = 100;
     const float wParam = 8.0f;
     const int kSize = 5;
-    const float sigmaX = 0.5f;
+    const float sigmaX = .7f * (intervalPitch + 0.1f);
+
+    const float flowDiffThres = 2.0f;
     Mat paddedImage2;
     Mat weights(flow.size(), CV_32FC2);
+    weights.setTo(Scalar(.01));
 
-    //Compute weight of occlusion. The occluding pixel has higher weight. The
     copyMakeBorder(image2, paddedImage2, topBdWidth, topBdWidth, sideBdWidth, sideBdWidth,
                    cv::BORDER_REPLICATE);
+    //Using horizontal pixel pairs to locate holes
     for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width; j++) {
+        for (int j = 0; j < width - 1; j++) {
+            Vec2f f0 = flow.at<Vec2f>(i, j);
+            Vec2f f1 = flow.at<Vec2f>(i, j + 1);
+            if (norm(f0 - f1) < flowDiffThres) {
+                //If the flow diff is small, ignore.
+                continue;
+            }
+            if (f0[0] > f1[0]) {
+                //The object on the left is overlapping the object on the right
+                continue;
+            }
+            float norm0 = norm(f0);
+            float norm1 = norm(f1);
+            Vec2f fMid = (f0 + f1) / 2.0f;
+            //Fetch intensity pointed by fMid, if the intensity is more similar to
+            //the intensity with smaller flow, this is a hole.
             float val0 = float(image1.at<uchar>(i, j));
-            int fx = int(std::trunc(flow.at<Vec2f>(i, j)[0]));
-            int fy = int(std::trunc(flow.at<Vec2f>(i, j)[1]));
-            float val1 = float(paddedImage2.at<uchar>(i + topBdWidth + fy, j + sideBdWidth + fx));
-            //The difference between val0 and val1 means this is a occluding pixel. Rather than an occluded one.
-            float wt = wParam / (abs(val0 - val1) + wParam);
-            weights.at<Vec2f>(i, j)[0] = wt;
-            weights.at<Vec2f>(i, j)[1] = wt;
+            float val1 = float(image1.at<uchar>(i, j + 1));
+
+            Vec2f point = {float(i) + fMid[1], float(j) + 0.5f + fMid[0]};
+            int ii = int(std::round(point[0]));
+            int jj = int(std::round(point[1]));
+            float valMid = float(paddedImage2.at<uchar>(ii + topBdWidth, jj + sideBdWidth));
+            Vec2f pointFG, pointBG, flowBG;
+            if (norm0 < norm1) {
+                //point 0 is background
+                if (std::abs(valMid - val0) > std::abs(valMid - val1)) {
+                    //No background exposed, do nothing
+                    continue;
+                }
+                pointBG = {float(j), float(i)};
+                pointBG += f0;
+                pointFG = {float(j + 1), float(i)};
+                pointFG += f1;
+                flowBG = f0 * intervalPitch - f0;
+            } else {
+                //point 1 is background
+                if (std::abs(valMid - val1) > std::abs(valMid - val0)) {
+                    //No background exposed, do nothing
+                    continue;
+                }
+                pointBG = {float(j + 1), float(i)};
+                pointBG += f1;
+                pointFG = {float(j), float(i)};
+                pointFG += f0;
+                flowBG = f1 * intervalPitch - f1;
+            }
+            createTriangles(width, height, pointBG, pointFG, flowBG, holeFillingTextureCoords,
+                            holeFillingVertices);
+
+            weights.at<Vec2f>(i, j)[0] = 1.0f;
+            weights.at<Vec2f>(i, j)[1] = 1.0f;
+            weights.at<Vec2f>(i, j + 1)[0] = 1.0f;
+            weights.at<Vec2f>(i, j + 1)[1] = 1.0f;
         }
     }
-    //Do weighted Gaussian filtering.
-    // Apply weights to the image
-    Mat weighted_flow;
-    multiply(flow, weights, weighted_flow, 1, CV_32FC2);
+    // Using virtical pairs to locate holes
+    for (int i = 0; i < height - 1; i++) {
+        for (int j = 0; j < width; j++) {
+            Vec2f f0 = flow.at<Vec2f>(i, j);
+            Vec2f f1 = flow.at<Vec2f>(i + 1, j);
+            if (norm(f0 - f1) < flowDiffThres) {
+                //If the flow diff is small, ignore.
+                continue;
+            }
+            if (f0[1] > f1[1]) {
+                //The object on the top is overlapping the object on the right
+                continue;
+            }
+            float norm0 = norm(f0);
+            float norm1 = norm(f1);
+            Vec2f fMid = (f0 + f1) / 2.0f;
+            //Fetch intensity pointed by fMid, if the intensity is more similar to
+            //the intensity with smaller flow, this is a hole.
+            float val0 = float(image1.at<uchar>(i, j));
+            float val1 = float(image1.at<uchar>(i + 1, j));
 
-    // Apply Gaussian blur to the weighted flow
+            Vec2f point = {float(i) + 0.5f + fMid[1], float(j) + fMid[0]};
+            int ii = int(std::round(point[0]));
+            int jj = int(std::round(point[1]));
+            float valMid = float(paddedImage2.at<uchar>(ii + topBdWidth, jj + sideBdWidth));
+            Vec2f pointFG, pointBG, flowBG;
+            if (norm0 < norm1) {
+                //point 0 is background
+                if (std::abs(valMid - val0) > std::abs(valMid - val1)) {
+                    //No background exposed, do nothing
+                    continue;
+                }
+                pointBG = {float(j), float(i)};
+                pointBG += f0;
+                pointFG = {float(j), float(i + 1)};
+                pointFG += f1;
+                flowBG = f0 * intervalPitch - f0;
+            } else {
+                //point 1 is background
+                if (std::abs(valMid - val1) > std::abs(valMid - val0)) {
+                    //No background exposed, do nothing
+                    continue;
+                }
+                pointBG = {float(j), float(i + 1)};
+                pointBG += f1;
+                pointFG = {float(j), float(i)};
+                pointFG += f0;
+                flowBG = f1 * intervalPitch - f1;
+            }
+            createTriangles(width, height, pointBG, pointFG, flowBG, holeFillingTextureCoords,
+                            holeFillingVertices);
+
+            weights.at<Vec2f>(i, j)[0] = 1.0f;
+            weights.at<Vec2f>(i, j)[1] = 1.0f;
+            weights.at<Vec2f>(i + 1, j)[0] = 1.0f;
+            weights.at<Vec2f>(i + 1, j)[1] = 1.0f;
+        }
+    }
+
+    // Gaussian filtering flow and blend with the original flow.
+    // Areas of hole are more biased toward original flow
+    Mat blurred_weight;
+    GaussianBlur(weights, blurred_weight, cv::Size(kSize, kSize), sigmaX);
+    float maxWeight = 0;
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            maxWeight = std::max(maxWeight, weights.at<Vec2f>(i, j)[0]);
+        }
+    }
+    maxWeight = std::max(maxWeight, .01f);
+    blurred_weight = blurred_weight / maxWeight;
+
+    // Apply Gaussian blur to the flow
     Mat blurred_flow;
-    GaussianBlur(weighted_flow, blurred_flow, cv::Size(kSize, kSize), sigmaX);
+    GaussianBlur(flow, blurred_flow, cv::Size(kSize, kSize), sigmaX);
 
-    // Normalize by the weights
-    Mat blurred_weights;
-    GaussianBlur(weights, blurred_weights, cv::Size(kSize, kSize), sigmaX);
-    flow = blurred_flow / blurred_weights;
+    // Apply weight to flow.
+    Mat filtered_flow0, filtered_flow1;
+    multiply(flow, blurred_weight, filtered_flow0);
+    multiply(blurred_flow, 1.0f - blurred_weight, filtered_flow1);
+    flow = filtered_flow0 + filtered_flow1;
 }
+
 
 /**
  * @brief Calculate optical flow from two images and return the
@@ -89,14 +290,19 @@ inline Point2f getFlowAt(int x, int y, Mat &flow) {
  * @param opticalFlowVertices OpenGL vertices used for optical flow based forward warping.
  * @param w Width of the images.
  * @param h Height of the images.
+ * @param workerId The id of the worker thread
+ * @param intervalPitch Shows temporal position o warped frame. 0: identical to prevPic,
+ *                       1: identical to nextPic, 0.5 in the midle of prevPic and nextPic
  * @return Byte array representing the processed image.
  */
 extern "C"
-JNIEXPORT jbyteArray JNICALL
+JNIEXPORT jbyteArray
+
+JNICALL
 Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
         JNIEnv *env, jobject /* this */, jbyteArray prevPic, jbyteArray nextPic,
         jfloatArray opticalFlowVertices,
-        jint w, jint h) {
+        jint w, jint h, jint workerId, jfloat intervalPitch) {
 
     // Get byte array data
     jbyte *prevPicData = env->GetByteArrayElements(prevPic, NULL);
@@ -117,16 +323,14 @@ Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
 
     // Calculate optical flow on the lower resolution images
     Mat flow_small;
-    Ptr<DenseOpticalFlow> opticalFlowCalculator =
-            cv::optflow::createOptFlow_SparseToDense();
-    opticalFlowCalculator->calc(img1_small, img2_small, flow_small);
+    opticalFlowCalculator[workerId]->calc(img1_small, img2_small, flow_small);
 
-    solveWarpingCollision(img1_small, img2_small, flow_small);
+    solveWarpingOcclusion(img1_small, img2_small, flow_small, holeFillingTextureCoords[workerId],
+                          holeFillingVertices[workerId], intervalPitch);
     // Get float array data
     jfloat *opticalFlowVerticesData = env->GetFloatArrayElements(opticalFlowVertices, NULL);
 
-
-// Set OpenGL vertices which covers the a 2.0 x 2.0 area.
+    // Set OpenGL vertices which covers the a 2.0 x 2.0 area.
     int smallW = w / 2;
     int smallH = h / 2;
     float w2_f = float(smallW / 2);
@@ -142,13 +346,15 @@ Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
             // Here we need to normalize the flow values to the range that the vertex coordinates are in.
             // Assuming that the maximum flow is not more than the image width or height
             // If the flow values exceed this, you may need to adjust this calculation.
+            // Note, the Y flow direction need to be reversed due to direction difference of
+            // image orientation and openGL vertex orientation.
             float flowX = flowAtPoint.x / smallW;
-            float flowY = flowAtPoint.y / smallH;
+            float flowY = -flowAtPoint.y / smallH;
 
             // Offset vertex positions by flow. If the flow is not significant, you may not see any changes.
             // You may need to multiply flowX and flowY with a scaling factor to see noticeable changes.
-            *vectexBuf++ = float(j) / w2_f - 1.0f + flowX;
-            *vectexBuf++ = float(i) / h2_f - 1.0f + flowY;
+            *vectexBuf++ = float(j) / w2_f - 1.0f + flowX * 2.0 * intervalPitch;
+            *vectexBuf++ = float(i) / h2_f - 1.0f + flowY * 2.0 * intervalPitch;
         }
     }
 
@@ -207,6 +413,48 @@ Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
     // Return byte array
     return returnByteArray;
 }
+
+extern "C"
+JNIEXPORT jfloatArray JNICALL
+Java_com_example_dualphoneshooter_MainActivity_getHoleFillingTextureCoords(
+        JNIEnv *env, jobject /* this */, jint workerId) {
+    // Create a new Java float array
+    if (holeFillingTextureCoords[workerId].empty()) {
+        return nullptr;
+    }
+    size_t size = holeFillingTextureCoords[workerId].size();
+    float *data_p = &holeFillingTextureCoords[workerId][0];
+    jfloatArray result = env->NewFloatArray(size);
+    if (result == nullptr) {
+        return nullptr;  // OutOfMemoryError already thrown by JVM
+    }
+
+    // Copy data from std::vector<float> to the Java float array
+    env->SetFloatArrayRegion(result, 0, size, data_p);
+    return result;
+}
+
+extern "C"
+JNIEXPORT jfloatArray JNICALL
+Java_com_example_dualphoneshooter_MainActivity_getHoleFillingVertices(
+        JNIEnv *env, jobject /* this */, jint workerId) {
+    // Create a new Java float array
+    if (holeFillingVertices[workerId].empty()) {
+        return nullptr;
+    }
+    size_t size = holeFillingVertices[workerId].size();
+    float *data_p = &holeFillingVertices[workerId][0];
+    jfloatArray result = env->NewFloatArray(size);
+    if (result == nullptr) {
+        return nullptr;  // OutOfMemoryError already thrown by JVM
+    }
+
+    // Copy data from std::vector<float> to the Java float array
+    env->SetFloatArrayRegion(result, 0, size, data_p);
+    return result;
+}
+
+
 
 /**
  * @brief Generate texture coordinates for a 2D texture that matches the dimensions of a specific image.

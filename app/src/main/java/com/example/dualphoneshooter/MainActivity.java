@@ -29,6 +29,7 @@ import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.SurfaceView;
+import android.view.WindowManager;
 import android.widget.ImageView;
 
 /**
@@ -65,7 +66,11 @@ public class MainActivity extends AppCompatActivity {
      * @param imageHeight         Height of the images.
      * @return Processed image data.
      */
-    private native byte[] getOpticalFlowImage(byte[] prevImg, byte[] nextImg, float[] opticalFlowVertices, int imageWidth, int imageHeight);
+    private native byte[] getOpticalFlowImage(byte[] prevImg, byte[] nextImg, float[] opticalFlowVertices, int imageWidth, int imageHeight, int workerId, float intervalPitch);
+
+    private native float[] getHoleFillingTextureCoords(int workerId);
+
+    private native float[] getHoleFillingVertices(int workerId);
 
     /**
      * Called when the activity is starting.
@@ -76,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         workThreads = new HandlerThread[3];
         workHandlers = new Handler[3];
@@ -185,7 +191,7 @@ public class MainActivity extends AppCompatActivity {
                 long localPrevPicTimestamp = prevPicTimestamp;
 
                 int workerId = workerIndex.getAndUpdate(i -> (i + 1) % workHandlers.length);
-                workHandlers[workerId].post(() -> processImagePairs(localPrevPic, nextPic, localPrevPicTimestamp, imageWidth, imageHeight));
+                workHandlers[workerId].post(() -> processImagePairs(localPrevPic, nextPic, localPrevPicTimestamp, imageWidth, imageHeight, workerId));
 
                 prevPic = nextPic;
                 prevPicTimestamp = nextPicTimestamp;
@@ -211,18 +217,27 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Process an image pair to generate and display an optical flow image.
      *
-     * @param prevImg Previous image data.
-     * @param nextImg Next image data.
-     * @param w       Width of the images.
-     * @param h       Height of the images.
+     * @param prevImg  Previous image data.
+     * @param nextImg  Next image data.
+     * @param w        Width of the images.
+     * @param h        Height of the images.
+     * @param workerId The id of the worker thread
      */
-    void processImagePairs(byte[] prevImg, byte[] nextImg, long prevImgTimestamp, int w, int h) {
+    void processImagePairs(byte[] prevImg, byte[] nextImg, long prevImgTimestamp, int w, int h, int workerId) {
         int glWidth = w / 2;
         int glHeight = h / 2;
         float[] opticalFlowVertices = new float[glWidth * glHeight * 2];
-        byte[] byteArray = getOpticalFlowImage(prevImg, nextImg, opticalFlowVertices, w, h);
+        byte[] byteArray = getOpticalFlowImage(prevImg, nextImg, opticalFlowVertices, w, h, workerId, 0.5f);
+        float[] hfTextureCoords = getHoleFillingTextureCoords(workerId);
+        float[] hfVertices = getHoleFillingVertices(workerId);
+        if (hfTextureCoords == null) {
+            hfTextureCoords = new float[1];
+        }
+        if (hfVertices == null) {
+            hfVertices = new float[1];
+        }
         //Submit optical flow estimation and frm0's timestamp for forward warping
-        openGLProcessor.addOpticalFlowVertices(prevImgTimestamp, opticalFlowVertices);
+        openGLProcessor.addOpticalFlowVertices(prevImgTimestamp, opticalFlowVertices, hfTextureCoords, hfVertices);
         Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         ByteBuffer buffer = ByteBuffer.wrap(byteArray);
         bitmap.copyPixelsFromBuffer(buffer);
