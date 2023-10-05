@@ -7,7 +7,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../sdk/native/jni/inclu
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../sdk/native/libs/${ANDROID_ABI})
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../sdk/native/staticlibs/${ANDROID_ABI})
 # Set your source files here.
-set(SOURCE_FILES native-lib.cpp)
+set(SOURCE_FILES native-lib.cpp optical-flow.cpp)
 
 add_library( # Specifies the name of the library.
         native-lib

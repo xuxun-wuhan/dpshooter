@@ -8,7 +8,16 @@
 #include <vector>
 #include <cmath>
 
+#include <android/log.h>
+
+#define LOG_TAG "I am here"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+
 using namespace cv;
+
+extern void computeDenseOpticalFlow(Mat &grayScale0, Mat &grayScale1, Mat &outFlow, int workID);
 
 // Prepare three instances of the Dense Optical Flow estimator
 // for three separate worker threads.
@@ -278,7 +287,6 @@ inline Point2f getFlowAt(int x, int y, Mat &flow) {
     flow = filtered_flow0 + filtered_flow1;
 }
 
-
 /**
  * @brief Calculate optical flow from two images and return the
  * result as a byte array. It also manipulates OpenGL vertices
@@ -323,10 +331,12 @@ Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
 
     // Calculate optical flow on the lower resolution images
     Mat flow_small;
-    opticalFlowCalculator[workerId]->calc(img1_small, img2_small, flow_small);
+    //opticalFlowCalculator[workerId]->calc(img1_small, img2_small, flow_small);
 
-    solveWarpingOcclusion(img1_small, img2_small, flow_small, holeFillingTextureCoords[workerId],
-                          holeFillingVertices[workerId], intervalPitch);
+    computeDenseOpticalFlow(img1_small, img2_small, flow_small, workerId);
+
+  //  solveWarpingOcclusion(img1_small, img2_small, flow_small, holeFillingTextureCoords[workerId],
+  //                        holeFillingVertices[workerId], intervalPitch);
     // Get float array data
     jfloat *opticalFlowVerticesData = env->GetFloatArrayElements(opticalFlowVertices, NULL);
 
