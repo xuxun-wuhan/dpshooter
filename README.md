@@ -1,13 +1,14 @@
 # DPShooter
 
-DPShooter is an Android application designed to utilize the camera in order to compute optical flow. Built with OpenCV and Android's CameraX library, this application provides a streamlined approach to calculate and display optical flow.
+DPShooter is an Android application engineered to leverage the capabilities of the camera to compute optical flow. Constructed using OpenCV and Android's CameraX library, this application offers a streamlined method for calculating and displaying optical flow. Furthermore, it visualizes an interpolated frame through optical flow-based forward warping.
 
 ![DPShooter Screenshot](./images/screenshot.jpg) 
 
 ## Features
 - Uses the CameraX API to capture frames from camera.
-- Optical flow calculation via Farneback method with OpenCV.
+- Ultra-fast edge-preserving optical flow calculation is achieved through computing optical flow at random locations using the Lucas-Kanade method with OpenCV. The sparse estimation is subsequently interpolated to produce a dense optical flow field through multi-scale guided filtering.
 - RGB display of optical flow.
+- An intermediate frame is displayed through forward warping, based on the dense optical flow fields. The warping is implemented in OpenGL. 
 
 ## Getting Started
 
