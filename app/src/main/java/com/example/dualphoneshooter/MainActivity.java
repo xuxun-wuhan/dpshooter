@@ -11,6 +11,7 @@ import androidx.lifecycle.LifecycleOwner;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.media.Image;
 import android.os.Bundle;
 
 import com.google.common.util.concurrent.ListenableFuture;
@@ -171,20 +172,38 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void analyze(ImageProxy image) {
                 if (prevPic == null) {
-                    ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
-                    ByteBuffer yBuffer = yPlane.getBuffer();
-                    yBuffer.rewind();
-                    prevPic = new byte[yBuffer.remaining()];
-                    yBuffer.get(prevPic);
+                    //TODO assuming the Y and VU pixels are packed in NV21 format
+                    //No padding at each row.
+                    ImageProxy.PlaneProxy[] planes = image.getPlanes();
+                    ByteBuffer yPlane = planes[0].getBuffer();
+                    ByteBuffer vuPlane = planes[1].getBuffer();
+                    int ySize = yPlane.remaining();
+                    int vuSize = vuPlane.remaining();
+                    prevPic = new byte[ySize + vuSize + 1];
+                    // Directly copy Y plane data
+                    yPlane.get(prevPic, 0, ySize);
+                    vuPlane.get(prevPic, ySize, vuSize);
+                    //So far, all vu interleaved pixels are copied, except the last u pixel.
+                    ByteBuffer uvPlane = planes[2].getBuffer();
+                    uvPlane.position(uvPlane.limit() - 1);
+                    prevPic[prevPic.length - 1] = uvPlane.get();
                     prevPicTimestamp = image.getImageInfo().getTimestamp();
                     image.close();
                     return;
                 }
-                ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
-                ByteBuffer yBuffer = yPlane.getBuffer();
-                yBuffer.rewind();
-                nextPic = new byte[yBuffer.remaining()];
-                yBuffer.get(nextPic);
+                ImageProxy.PlaneProxy[] planes = image.getPlanes();
+                ByteBuffer yPlane = planes[0].getBuffer();
+                ByteBuffer vuPlane = planes[1].getBuffer();
+                int ySize = yPlane.remaining();
+                int vuSize = vuPlane.remaining();
+                nextPic = new byte[ySize + vuSize + 1];
+                // Directly copy Y plane data
+                yPlane.get(nextPic, 0, ySize);
+                vuPlane.get(nextPic, ySize, vuSize);
+                //So far, all vu interleaved pixels are copied, except the last u pixel.
+                ByteBuffer uvPlane = planes[2].getBuffer();
+                uvPlane.position(uvPlane.limit() - 1);
+                nextPic[nextPic.length - 1] = uvPlane.get();
                 nextPicTimestamp = image.getImageInfo().getTimestamp();
 
                 byte[] localPrevPic = prevPic.clone();

@@ -9,6 +9,7 @@
 #include <opencv2/optflow.hpp>
 #include <opencv2/video/tracking.hpp>
 #include <stdexcept>
+#include <random>
 
 #include <vector>
 #include <cmath>
@@ -133,6 +134,74 @@ inline float getSubareaSum(int i, int j, const float *array2d, int width, int he
     return val;
 }
 
+static std::vector <std::vector<float>> flowPointsByColor[3][16][16][16];
+static float SPICE_THRES = .8f;
+
+/**
+ * @fn void spiceSparseOFPoints(const Mat &grayScale0, const uint8_t *vu, const std::vector<Point2f> &points_filtered,
+ *         std::vector<Point2f> &dst_points_filtered, int workID)
+ * @brief Mitigate the blending of foreground flow into adjacent background areas.
+ *
+ * This function categorizes all color pixel values into 3x16x16x16 (3 channels, 4-bit color) buckets.
+ * All estimated optical flows are logged in corresponding buckets by color. Subsequently, for every estimated optical flow point,
+ * there's a probability that the flow values are supplanted by values randomly selected from its bucket. The magnitude of this
+ * probability is governed by SPICE_THRES. This approach aids in preventing the flow of the foreground from permeating into the
+ * adjacent background area.
+ * TODO: Some artifacts appear when the camera is rotating. This issue should not be too challenging to rectify.
+ * @param grayScale0 Grayscale source image.
+ * @param vu UV plane pixel data (chroma components in image data).
+ * @param points_filtered Initial points before applying optical flow.
+ * @param dst_points_filtered Resultant points after applying optical flow.
+ * @param workID Identifier used to differentiate between various working threads or data arrays.
+ */void spiceSparseOFPoints(const Mat &grayScale0, const uint8_t *vu,
+                            const std::vector <Point2f> &points_filtered,
+                            std::vector <Point2f> &dst_points_filtered, int workID) {
+    // Loop through each pixel of each color bucket, resetting its size to 0.
+    // This step ensures that any previously stored optical flow vectors are cleared.
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            for (int k = 0; k < 16; k++) {
+                flowPointsByColor[workID][i][j][k].resize(0);
+            }
+        }
+    }
+    int m0 = grayScale0.rows;
+    int n0 = grayScale0.cols;
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::uniform_real_distribution<> distr(.0f, 1.0f);
+    int n = points_filtered.size();
+    // Loop through all sparse optical flow points to gather statistics.
+    for (int i = 0; i < n; i++) {
+        auto p0 = points_filtered[i];
+        auto p1 = dst_points_filtered[i];
+        int ii = std::round(p0.y);
+        int jj = std::round(p0.x);
+        int yVal = int(grayScale0.at<uchar>(ii, jj) / 16);
+        int vVal = int(vu[(ii * n0 + jj) * 2] / 16);
+        int uVal = int(vu[(ii * n0 + jj) * 2 + 1] / 16);
+        // Store optical flow vectors by color in respective buckets.
+        flowPointsByColor[workID][yVal][uVal][vVal].push_back({p1.x - p0.x, p1.y - p0.y});
+    }
+    // Replace optical flow vectors with another from the same bucket depending on SPICE_THRES.
+    for (int i = 0; i < n; i++) {
+        auto p0 = points_filtered[i];
+        auto &p1 = dst_points_filtered[i];
+        int ii = std::round(p0.y);
+        int jj = std::round(p0.x);
+        int yVal = int(grayScale0.at<uchar>(ii, jj) / 16);
+        int vVal = int(vu[(ii * n0 + jj) * 2] / 16);
+        int uVal = int(vu[(ii * n0 + jj) * 2 + 1] / 16);
+        auto rec = flowPointsByColor[workID][yVal][uVal][vVal];
+        int idx = int(float(rec.size()) * distr(gen));
+        float pos = distr(gen);
+        if (pos < SPICE_THRES) {
+            p1.x = p0.x + rec[idx][0];
+            p1.y = p0.y + rec[idx][1];
+        }
+    }
+}
+
 static const int PADDED_MAX_H = 960;
 static const int PADDED_MAX_W = 1280;
 static const int H_PAD_SIZE = 128;
@@ -144,6 +213,7 @@ static const std::vector<float> pitch_weights = {1.0f, .2f, .04f};
 static const float epsilon = .001f;
 
 static const int MIN_OF_POINTS = 5;
+static const int NUM_SPARSE_OPFL_POINTS = 2000;
 
 static float weight[3][PADDED_MAX_H * PADDED_MAX_W];
 static float weightedFx[3][PADDED_MAX_H * PADDED_MAX_W];
@@ -166,7 +236,8 @@ static float dataStabilityCoef = 1.0f / 128.0f;
  * @param outFlow Output matrix to store the estimated optical flow.
  * @param workID ID of the work, used to select working arrays.
  */
-void computeDenseOpticalFlow(Mat &grayScale0, Mat &grayScale1, Mat &outFlow, int workID) {
+void
+computeDenseOpticalFlow(Mat &grayScale0, Mat &grayScale1, uint8_t *vu, Mat &outFlow, int workID) {
     //Check inputs and handle edge cases
     int m0 = grayScale0.rows;
     int n0 = grayScale0.cols;
@@ -179,21 +250,26 @@ void computeDenseOpticalFlow(Mat &grayScale0, Mat &grayScale1, Mat &outFlow, int
         throw std::invalid_argument("computeDenseOpticalFlow");
     }
 
-    int grid_step = 6;
-    std::vector<Point2f> points;
-    std::vector<Point2f> dst_points;
+    std::vector <Point2f> points;
+    std::vector <Point2f> dst_points;
     std::vector<unsigned char> status;
     std::vector<float> err;
-    std::vector<Point2f> points_filtered, dst_points_filtered;
+    std::vector <Point2f> points_filtered, dst_points_filtered;
     float maxXDiff = 32.0f;  //Flow larger than this is an outlier
     float maxYDiff = 20.0f;  //Flow larger than this is an outlier
     int width = grayScale0.cols;
     int height = grayScale0.rows;
     int paddedWidth = width + H_PAD_SIZE * 2;
     int paddedHeight = height + V_PAD_SIZE * 2;
-    for (int i = 0; i < grayScale0.rows; i += grid_step)
-        for (int j = 0; j < grayScale0.cols; j += grid_step)
-            points.push_back(Point2f((float) j, (float) i));
+
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::uniform_int_distribution<> distrX(0, n0 - 1); // define the range [0, n0)
+    std::uniform_int_distribution<> distrY(0, m0 - 1); // define the range [0, m0)
+    for (int i = 0; i < NUM_SPARSE_OPFL_POINTS; i++) {
+        points.push_back(Point2f(float(distrX(gen)), float(distrY(gen))));
+    }
+
     calcOpticalFlowPyrLK(grayScale0, grayScale1, points, dst_points, status, err, Size(21, 21));
     for (unsigned int i = 0; i < points.size(); i++) {
         if (status[i] != 0) {
@@ -213,9 +289,9 @@ void computeDenseOpticalFlow(Mat &grayScale0, Mat &grayScale1, Mat &outFlow, int
         return;
     }
 
+    spiceSparseOFPoints(grayScale0, vu, points_filtered, dst_points_filtered, workID);
     //Do multi-scale guided filtering
     //Zero weight, weighted_Fx and weighted_Fy
-
     memset(reinterpret_cast<void *>(&weight[workID][0]), 0,
            paddedHeight * paddedWidth * sizeof(float));
     memset(reinterpret_cast<void *>(&weightedFx[workID][0]), 0,

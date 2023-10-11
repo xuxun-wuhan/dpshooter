@@ -17,7 +17,7 @@
 
 using namespace cv;
 
-extern void computeDenseOpticalFlow(Mat &grayScale0, Mat &grayScale1, Mat &outFlow, int workID);
+extern void computeDenseOpticalFlow(Mat &grayScale0, Mat &grayScale1, uint8_t *vu, Mat &outFlow, int workID);
 
 // Prepare three instances of the Dense Optical Flow estimator
 // for three separate worker threads.
@@ -333,7 +333,7 @@ Java_com_example_dualphoneshooter_MainActivity_getOpticalFlowImage(
     Mat flow_small;
     //opticalFlowCalculator[workerId]->calc(img1_small, img2_small, flow_small);
 
-    computeDenseOpticalFlow(img1_small, img2_small, flow_small, workerId);
+    computeDenseOpticalFlow(img1_small, img2_small, reinterpret_cast<uint8_t*>(prevPicData + w*h), flow_small, workerId);
 
   //  solveWarpingOcclusion(img1_small, img2_small, flow_small, holeFillingTextureCoords[workerId],
   //                        holeFillingVertices[workerId], intervalPitch);
